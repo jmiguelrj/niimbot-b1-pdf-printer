@@ -9,6 +9,7 @@
 | **Task #5** | `COMPLETED` | Multi-PC x64/ARM64 dynamic USB + Windows BLE pacing hardening, multi-page PDF batch printing (`AbortController`), zero-dependency Offline PWA (`sw.js` + `manifest.webmanifest`), GitHub Pages HTTPS CI/CD & merge to `main` | `vite.config.ts` (`base: "./"`), `public/manifest.webmanifest`, `public/pwa-icon.svg`, `.github/workflows/deploy-pages.yml`, `docs/SOP-004-MULTI-PC-AND-BLUETOOTH-DEPLOYMENT.md`; `npx tsc --noEmit` exits `0`; `npm run build` emits `dist/sw.js` (0 npm vulns); 10/10 unit tests pass; merged to `main` |
 | **Task #6** | `COMPLETED` | Read-only security, public-repo readiness & proxy routing discovery audit | `npm audit` 0 vulns; identified missing `LICENSE`, `appRoot.innerHTML`, unbounded PDF size/pages, and missing CSP; confirmed production reverse proxy routing requirements with zero local/remote mutations |
 | **Task #7** | `COMPLETED` | Security hardening, MIT `LICENSE`, `--nb-*` design tokens (`src/tokens.css`), `@biomejs/biome`, `scripts/verify-guardrails.mjs`, `CLAUDE.md`, `.antigravityrules`, pre-commit hook & CI gate | `npm audit` 0 vulns; `npm run check` (Biome + `tsc` + `verify:guardrails` + 13/13 tests) exits `0`; `npm run build` exits `0`; `docs/SOP-005-SECURITY-AND-AGENTIC-GUARDRAILS.md` created & merged to `main` |
+| **Task #8** | `COMPLETED` | Apple macOS Sonoma / iPadOS Print Center UI/UX redesign with `#FA4676` brand accent, Light/Auto/Dark switcher & pure-DOM SVG icon factory | `src/tokens.css`, `src/style.css`, `src/ui/icons.ts`, `src/main.ts`, updated PWA squircle icons/manifest; `npm audit` 0 vulns; `npm run check` & `npm run build` exit `0` |
 
 ---
 
@@ -99,6 +100,14 @@
   - Added `src/pdf/validation.ts` (`MAX_PDF_BYTES = 25 MB`, `MAX_PDF_PAGES = 100`, `%PDF-` magic-header validation) and strict CSP `<meta>` tag in `index.html`.
   - Extracted canonical `--nb-*` CSS custom properties into `src/tokens.css` (with dark-mode support via `prefers-color-scheme: dark` and `[data-theme="dark"]`), refactoring `src/style.css` to 100% `var(--nb-*)` token consumption.
   - Installed `@biomejs/biome@2.6.8` (`noExplicitAny: "error"`, `noDangerouslySetInnerHtml: "error"`), `scripts/verify-guardrails.mjs`, `CLAUDE.md`, `.antigravityrules`, `.githooks/pre-commit`, and `.github/workflows/ci.yml`.
+
+### Task #8 — Apple Cupertino Print-Center UI/UX Redesign (`#FA4676`)
+- **Date**: 2026-11-16
+- **Branch**: `feat/apple-cupertino-ui` → merged into `main`
+- **Design & Engineering**:
+  - Updated `src/tokens.css` with Apple HIG Light/Pro Dark palettes (`#F5F5F7` / `#0B0B0D`), frosted vibrancy glass (`--nb-glass-blur: 24px`), concentric squircle radii, spring easing, and `#FA4676` primary brand accent (`theme_color` synced in `public/manifest.webmanifest`, `index.html`, `public/pwa-icon.svg`, and `public/favicon.svg`).
+  - Added pure-DOM SF-Symbol-inspired SVG factory `src/ui/icons.ts` using `document.createElementNS` (zero `innerHTML`, space-separated SVG path coordinates).
+  - Refactored `src/main.ts` and `src/style.css` into a sticky frosted topbar with Light/Auto/Dark segmented control (`localStorage`-persisted via `document.documentElement.dataset.theme`), sticky inspector sidebar with Apple segmented controls & `#FA4676` sliders/stepper, tactile PDF dropzone hero, sticky batch toolbar, and 50×50 mm silicone release-liner sticker preview cards with toggleable 1 mm bleed guides.
 
 ---
 

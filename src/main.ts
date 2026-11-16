@@ -13,10 +13,16 @@ import {
   DEFAULT_LABEL_TYPE,
   DEFAULT_PRINT_DENSITY,
   detectBrowserTransportCapabilities,
+  MAX_SINGLE_PRINT_COPIES,
   type PrinterTelemetrySnapshot,
   type PrintLiveProgress,
   type ProtocolLogEntry,
 } from "./printer/b1Client.ts";
+import { createIcon } from "./ui/icons.ts";
+
+type ThemeMode = "light" | "auto" | "dark";
+
+const THEME_STORAGE_KEY = "nb-theme-mode";
 
 interface AppState {
   fileName: string | null;
@@ -29,6 +35,9 @@ interface AppState {
   density: number;
   copies: number;
   filterKnownUsbVendors: boolean;
+  showBleedGuides: boolean;
+  themeMode: ThemeMode;
+  logCount: number;
 }
 
 interface ElementProps {
@@ -74,44 +83,28 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const state: AppState = {
-  fileName: null,
-  pdfBytes: null,
-  options: { ...DEFAULT_RASTER_OPTIONS },
-  pages: [],
-  selectedPageNumbers: new Set<number>(),
-  isRendering: false,
-  labelType: DEFAULT_LABEL_TYPE,
-  density: DEFAULT_PRINT_DENSITY,
-  copies: 1,
-  filterKnownUsbVendors: true,
-};
-
-let renderSeq = 0;
-let activeBatchAbort: AbortController | null = null;
-let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
-
-const printer = new B1PrinterController();
-const capabilities = detectBrowserTransportCapabilities();
-
-function parseFitMode(value: string): FitMode {
-  return value === "crop-bleed" ? "crop-bleed" : "fit";
+function loadSavedTheme(): ThemeMode {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (raw === "light" || raw === "dark" || raw === "auto") {
+      return raw;
+    }
+  } catch {
+    // Ignore storage access errors in restricted frames
+  }
+  return "auto";
 }
 
-function parseDitherMode(value: string): DitherMode {
-  return value === "atkinson" ? "atkinson" : "threshold";
-}
-
-function parseRotation(value: string | undefined): RotationDegrees {
-  switch (value) {
-    case "90":
-      return 90;
-    case "180":
-      return 180;
-    case "270":
-      return 270;
-    default:
-      return 0;
+function applyThemeMode(mode: ThemeMode): void {
+  if (mode === "light" || mode === "dark") {
+    document.documentElement.dataset.theme = mode;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+  } catch {
+    // Ignore storage write errors
   }
 }
 
@@ -126,18 +119,38 @@ function parseLabelType(value: string): LabelType {
   }
 }
 
+const initialTheme = loadSavedTheme();
+applyThemeMode(initialTheme);
+
+const state: AppState = {
+  fileName: null,
+  pdfBytes: null,
+  options: { ...DEFAULT_RASTER_OPTIONS },
+  pages: [],
+  selectedPageNumbers: new Set<number>(),
+  isRendering: false,
+  labelType: DEFAULT_LABEL_TYPE,
+  density: DEFAULT_PRINT_DENSITY,
+  copies: 1,
+  filterKnownUsbVendors: true,
+  showBleedGuides: true,
+  themeMode: initialTheme,
+  logCount: 0,
+};
+
+let renderSeq = 0;
+let activeBatchAbort: AbortController | null = null;
+let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
+
+const printer = new B1PrinterController();
+const capabilities = detectBrowserTransportCapabilities();
+
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) {
   throw new Error("Missing #app container in index.html");
 }
 
-// Build DOM strictly via typed element helpers (zero innerHTML / zero inline styles)
-const installPwaBtn = el("button", {
-  id: "install-pwa-btn",
-  type: "button",
-  className: "btn btn-sm is-hidden",
-  text: "Install Desktop App",
-});
+// --- Sticky Frosted Top Navigation Bar ---
 const hwDot = el("span", {
   id: "hw-dot",
   className: "hardware-dot",
@@ -147,24 +160,88 @@ const hwBadgeText = el("span", {
   id: "hw-badge-text",
   text: "Printer: Disconnected",
 });
+const installPwaBtn = el(
+  "button",
+  {
+    id: "install-pwa-btn",
+    type: "button",
+    className: "btn btn-tinted btn-sm is-hidden",
+  },
+  createIcon("downloadApp", 15),
+  el("span", { text: "Install App" }),
+);
+
+const themeModes: ReadonlyArray<{
+  mode: ThemeMode;
+  label: string;
+  icon: "sun" | "autoTheme" | "moon";
+}> = [
+  { mode: "light", label: "Light", icon: "sun" },
+  { mode: "auto", label: "Auto", icon: "autoTheme" },
+  { mode: "dark", label: "Dark", icon: "moon" },
+];
+
+const themeButtons = themeModes.map(({ mode, label, icon }) =>
+  el(
+    "button",
+    {
+      type: "button",
+      role: "radio",
+      className: state.themeMode === mode ? "seg-btn is-active" : "seg-btn",
+      attrs: {
+        "data-theme-mode": mode,
+        "aria-checked": String(state.themeMode === mode),
+        "aria-label": `${label} theme`,
+      },
+    },
+    createIcon(icon, 14),
+    el("span", { text: label }),
+  ),
+);
+
+const themeSegmented = el(
+  "div",
+  {
+    id: "theme-segmented",
+    className: "segmented segmented-compact",
+    role: "radiogroup",
+    attrs: { "aria-label": "Appearance mode" },
+  },
+  ...themeButtons,
+);
 
 const topbar = el(
   "header",
   { className: "topbar" },
   el(
     "div",
-    {},
-    el("h1", { text: "Niimbot B1 — 50×50 mm PDF Label Printer" }),
-    el("p", {
-      className: "topbar-sub",
-      text: "Portable x64 & ARM64 Windows · Zero-Driver USB-C & Bluetooth BLE · 203 DPI (384×400 px)",
-    }),
+    { className: "topbar-brand" },
+    el(
+      "div",
+      { className: "brand-emblem", attrs: { "aria-hidden": "true" } },
+      createIcon("brandMark", 20),
+    ),
+    el(
+      "div",
+      { className: "brand-titles" },
+      el(
+        "div",
+        { className: "brand-title-row" },
+        el("h1", { text: "Label Studio" }),
+        el("span", { className: "model-pill", text: "Niimbot B1 · 50×50 mm" }),
+      ),
+      el("p", {
+        className: "topbar-sub",
+        text: "Zero-driver USB-C & Bluetooth BLE · 203 DPI · 384×400 px Thermal Print Center",
+      }),
+    ),
   ),
   el(
     "div",
     { className: "topbar-actions" },
+    el("div", { id: "hw-badge", className: "hardware-badge", role: "status" }, hwDot, hwBadgeText),
     installPwaBtn,
-    el("div", { className: "hardware-badge", role: "status" }, hwDot, hwBadgeText),
+    themeSegmented,
   ),
 );
 
@@ -197,43 +274,68 @@ const capabilityWarningNode =
         )
       : null;
 
-const refreshTelemetryBtn = el("button", {
-  id: "refresh-telemetry-btn",
-  type: "button",
-  className: "btn btn-sm",
-  text: "Refresh",
-  disabled: true,
-});
-const connectUsbBtn = el("button", {
-  id: "connect-usb-btn",
-  type: "button",
-  className: "btn btn-primary",
-  text: "Connect USB-C (Any Windows PC)",
-  disabled: !capabilities.webSerialSupported,
-});
-const connectBleBtn = el("button", {
-  id: "connect-ble-btn",
-  type: "button",
-  className: "btn",
-  text: "Connect Bluetooth (BLE)",
-  disabled: !capabilities.webBluetoothSupported,
-});
+// --- Inspector Group 1: Printer & Sensor ---
+const refreshTelemetryBtn = el(
+  "button",
+  {
+    id: "refresh-telemetry-btn",
+    type: "button",
+    className: "btn btn-quiet btn-sm",
+    title: "Refresh printer battery, cover, and RFID spool telemetry",
+    disabled: true,
+  },
+  createIcon("refresh", 14),
+  el("span", { text: "Refresh" }),
+);
+
+const connectUsbBtn = el(
+  "button",
+  {
+    id: "connect-usb-btn",
+    type: "button",
+    className: "btn btn-primary",
+    disabled: !capabilities.webSerialSupported,
+  },
+  createIcon("usb", 16),
+  el("span", { text: "Connect USB-C" }),
+);
+
+const connectBleBtn = el(
+  "button",
+  {
+    id: "connect-ble-btn",
+    type: "button",
+    className: "btn btn-tinted",
+    disabled: !capabilities.webBluetoothSupported,
+  },
+  createIcon("bluetooth", 16),
+  el("span", { text: "Connect Bluetooth" }),
+);
+
 const usbFilterToggle = el("input", {
   id: "usb-filter-toggle",
   type: "checkbox",
+  className: "apple-checkbox",
   checked: true,
 });
-const disconnectBtn = el("button", {
-  id: "disconnect-btn",
-  type: "button",
-  className: "btn btn-sm",
-  text: "Disconnect",
-  disabled: true,
-});
+
+const disconnectBtn = el(
+  "button",
+  {
+    id: "disconnect-btn",
+    type: "button",
+    className: "btn btn-quiet btn-sm",
+    disabled: true,
+  },
+  createIcon("disconnect", 14),
+  el("span", { text: "Disconnect" }),
+);
+
 const modelWarningEl = el("div", {
   id: "model-warning",
   className: "status-banner is-warn is-hidden",
 });
+
 const telModelEl = el("span", { id: "tel-model", className: "telemetry-val", text: "—" });
 const telBatteryEl = el("span", { id: "tel-battery", className: "telemetry-val", text: "—" });
 const telSensorsEl = el("span", { id: "tel-sensors", className: "telemetry-val", text: "—" });
@@ -245,7 +347,7 @@ const telSpoolEl = el("span", {
 
 const labelTypeSelect = el(
   "select",
-  { id: "label-type-select" },
+  { id: "label-type-select", className: "apple-select" },
   el("option", {
     attrs: { value: "1", selected: "selected" },
     text: "Gap Sensor — Die-Cut Stickers (WithGaps = 1)",
@@ -259,38 +361,33 @@ const labelTypeSelect = el(
     text: "Black Mark Roll (Black = 2)",
   }),
 );
-const densityValueEl = el("span", {
-  id: "density-value",
-  className: "mono-value",
-  text: `${state.density} / 5`,
-});
-const densitySlider = el("input", {
-  id: "density-slider",
-  type: "range",
-  attrs: { min: "1", max: "5", step: "1", value: String(state.density) },
-});
-const copiesInput = el("input", {
-  id: "copies-input",
-  type: "number",
-  attrs: { min: "1", max: "20", step: "1", value: String(state.copies) },
-});
-const feedGapBtn = el("button", {
-  id: "feed-gap-btn",
-  type: "button",
-  className: "btn",
-  text: "Test Gap Feed (1 Label)",
-  title:
-    "Recommended: Feeds 1 blank sticker (zero thermal heat) to align the next die-cut gap with the tear bar",
-  disabled: true,
-});
-const calibrateSensorBtn = el("button", {
-  id: "calibrate-sensor-btn",
-  type: "button",
-  className: "btn",
-  text: "Calibrate Sensor (0x8E)",
-  title: "Factory optical voltage calibration (0x8E): feeds ~15 cm (2-3 labels) on B1",
-  disabled: true,
-});
+
+const feedGapBtn = el(
+  "button",
+  {
+    id: "feed-gap-btn",
+    type: "button",
+    className: "btn btn-quiet",
+    title:
+      "Recommended: Feeds 1 blank sticker (zero thermal heat) to align the next die-cut gap with the tear bar",
+    disabled: true,
+  },
+  el("span", { text: "Test 1-Label Gap Feed" }),
+);
+
+const calibrateSensorBtn = el(
+  "button",
+  {
+    id: "calibrate-sensor-btn",
+    type: "button",
+    className: "btn btn-quiet",
+    title: "Factory optical voltage calibration (0x8E): feeds ~15 cm (2–3 labels) on B1",
+    disabled: true,
+  },
+  createIcon("sparkles", 15),
+  el("span", { text: "Calibrate Sensor" }),
+);
+
 const printProgressLabel = el("div", { id: "print-progress-label", text: "Idle" });
 const printProgressBar = el("progress", {
   id: "print-progress-bar",
@@ -311,17 +408,22 @@ const hwStatusBanner = el("div", {
 
 const hardwarePanel = el(
   "section",
-  { className: "panel", attrs: { "aria-label": "Niimbot B1 Hardware Transport" } },
+  { className: "panel", attrs: { "aria-label": "Printer and Sensor" } },
   el(
     "div",
     { className: "panel-title-row" },
-    el("h2", { className: "panel-title", text: "Hardware Transport (USB-C / BLE)" }),
+    el(
+      "div",
+      { className: "panel-heading" },
+      createIcon("printer", 17),
+      el("h2", { className: "panel-title", text: "Printer & Sensor" }),
+    ),
     refreshTelemetryBtn,
   ),
   el("div", { className: "btn-grid-2" }, connectUsbBtn, connectBleBtn),
   el(
     "div",
-    { className: "btn-grid-2" },
+    { className: "utility-row" },
     el(
       "label",
       {
@@ -330,34 +432,34 @@ const hardwarePanel = el(
           "Filters WebSerial picker to Niimbot VID_3513 (built-in Windows usbser.sys) and CH34x VID_1A86",
       },
       usbFilterToggle,
-      el("span", { text: "Filter Niimbot USB (VID_3513)" }),
+      el("span", { text: "Filter VID_3513" }),
     ),
     disconnectBtn,
   ),
   el(
     "details",
-    { className: "guide-callout" },
-    el("summary", { text: "BLE & Multi-PC Connection Guide (3 Rules)" }),
+    { className: "tips-disclosure" },
+    el("summary", {}, createIcon("info", 14), el("span", { text: "Windows BLE & Multi-PC Tips" })),
     el(
       "ol",
       {},
       el(
         "li",
         {},
-        el("strong", { text: "Unplug PC USB-C to use Bluetooth: " }),
-        "B1 prioritizes USB data over BLE when plugged into a computer port (battery or wall brick is fine).",
+        el("strong", { text: "Unplug PC USB-C for BLE: " }),
+        "B1 prioritizes USB data over Bluetooth when connected to a computer port.",
       ),
       el(
         "li",
         {},
-        el("strong", { text: "Disconnect phone / desktop apps: " }),
-        "B1 accepts only 1 active BLE or Serial connection at a time.",
+        el("strong", { text: "Single host at a time: " }),
+        "Close mobile or desktop Niimbot apps before scanning.",
       ),
       el(
         "li",
         {},
-        el("strong", { text: "Use Edge or Chrome (HTTPS / localhost): " }),
-        "Works on any Intel/AMD x64 or Snapdragon ARM64 Windows PC with zero drivers.",
+        el("strong", { text: "Zero drivers needed: " }),
+        "Works in Edge or Chrome on Intel/AMD x64 and Snapdragon ARM64 over HTTPS or localhost.",
       ),
     ),
   ),
@@ -386,7 +488,7 @@ const hardwarePanel = el(
     el(
       "div",
       { className: "telemetry-item full-span" },
-      el("span", { className: "telemetry-key", text: "RFID / Spool Roll" }),
+      el("span", { className: "telemetry-key", text: "Spool / RFID" }),
       telSpoolEl,
     ),
   ),
@@ -402,98 +504,78 @@ const hardwarePanel = el(
   ),
   el(
     "div",
-    { className: "inline-fields" },
-    el(
-      "div",
-      { className: "control-group" },
-      el(
-        "div",
-        { className: "threshold-row" },
-        el("label", {
-          className: "control-label",
-          attrs: { for: "density-slider" },
-          text: "Thermal Density",
-        }),
-        densityValueEl,
-      ),
-      densitySlider,
-    ),
-    el(
-      "div",
-      { className: "control-group" },
-      el("label", {
-        className: "control-label",
-        attrs: { for: "copies-input" },
-        text: "Copies / Page",
-      }),
-      copiesInput,
-    ),
-  ),
-  el(
-    "div",
     { className: "control-group" },
-    el("span", { className: "control-label", text: "Gap Alignment & Optical Calibration" }),
+    el("span", { className: "control-label", text: "Gap Alignment" }),
     el("div", { className: "btn-grid-2" }, feedGapBtn, calibrateSensorBtn),
-    el("span", {
-      className: "control-hint",
-      text: 'Use "Test Gap Feed" to align 1 sticker to the tear bar; "Calibrate Sensor" feeds ~2–3 labels.',
-    }),
   ),
   printProgressBox,
   hwStatusBanner,
 );
 
-const fileInput = el("input", {
-  id: "pdf-input",
-  type: "file",
-  className: "hidden-input",
-  attrs: { accept: "application/pdf,.pdf" },
-});
-const dropzone = el(
+// --- Inspector Group 2: Raster & Thermal Engine ---
+const fitModeOptions: ReadonlyArray<{ value: FitMode; label: string }> = [
+  { value: "fit", label: "Scale to Fit" },
+  { value: "crop-bleed", label: "1:1 Bleed Crop" },
+];
+const fitModeButtons = fitModeOptions.map(({ value, label }) =>
+  el("button", {
+    type: "button",
+    role: "radio",
+    className: state.options.fitMode === value ? "seg-btn is-active" : "seg-btn",
+    text: label,
+    attrs: {
+      "data-fit-mode": value,
+      "aria-checked": String(state.options.fitMode === value),
+    },
+  }),
+);
+const fitModeSegmented = el(
   "div",
   {
-    id: "dropzone",
-    className: "dropzone",
-    role: "button",
-    attrs: { tabindex: "0", "aria-label": "Select or drop PDF file" },
+    id: "fit-mode-segmented",
+    className: "segmented",
+    role: "radiogroup",
+    attrs: { "aria-label": "Sizing mode" },
   },
-  el("div", { className: "dropzone-title", text: "Drop 50×50 mm PDF here or click to browse" }),
-  el("div", {
-    className: "dropzone-hint",
-    text: "Single or multi-page PDF · Max 25 MB / 100 pages · Scripting disabled",
-  }),
-  fileInput,
+  ...fitModeButtons,
 );
-const fileMetaEl = el("div", { id: "file-meta", className: "file-meta", text: "No PDF loaded" });
-const fitModeSelect = el(
-  "select",
-  { id: "fit-mode" },
-  el("option", { attrs: { value: "fit" }, text: "Scale to Fit (384×400 px - Safe)" }),
-  el("option", {
-    attrs: { value: "crop-bleed" },
-    text: "1:1 Physical Crop (Trim 1mm side bleed)",
-  }),
-);
-const ditherModeSelect = el(
-  "select",
-  { id: "dither-mode" },
-  el("option", {
-    attrs: { value: "threshold" },
-    text: "Sharp Threshold (Text / QR / Barcodes)",
-  }),
-  el("option", {
-    attrs: { value: "atkinson" },
-    text: "Atkinson Dither (Logos / Grayscale)",
+
+const ditherModeOptions: ReadonlyArray<{ value: DitherMode; label: string }> = [
+  { value: "threshold", label: "Sharp Threshold" },
+  { value: "atkinson", label: "Atkinson Dither" },
+];
+const ditherModeButtons = ditherModeOptions.map(({ value, label }) =>
+  el("button", {
+    type: "button",
+    role: "radio",
+    className: state.options.ditherMode === value ? "seg-btn is-active" : "seg-btn",
+    text: label,
+    attrs: {
+      "data-dither-mode": value,
+      "aria-checked": String(state.options.ditherMode === value),
+    },
   }),
 );
+const ditherModeSegmented = el(
+  "div",
+  {
+    id: "dither-mode-segmented",
+    className: "segmented",
+    role: "radiogroup",
+    attrs: { "aria-label": "1-Bit binarization mode" },
+  },
+  ...ditherModeButtons,
+);
+
 const thresholdValueEl = el("span", {
   id: "threshold-value",
-  className: "mono-value",
+  className: "value-pill",
   text: String(state.options.threshold),
 });
 const thresholdSlider = el("input", {
   id: "threshold-slider",
   type: "range",
+  className: "apple-range",
   attrs: { min: "80", max: "230", step: "1", value: String(state.options.threshold) },
 });
 const thresholdGroup = el(
@@ -512,137 +594,276 @@ const thresholdGroup = el(
   thresholdSlider,
 );
 
-const rotationButtons = (["0", "90", "180", "270"] as const).map((deg) =>
+const rotationValues: ReadonlyArray<RotationDegrees> = [0, 90, 180, 270];
+const rotationButtons = rotationValues.map((deg) =>
   el("button", {
     type: "button",
-    className: deg === "0" ? "rot-btn is-active" : "rot-btn",
+    role: "radio",
+    className: state.options.rotation === deg ? "seg-btn is-active" : "seg-btn",
     text: `${deg}°`,
-    attrs: { "data-rot": deg },
+    attrs: {
+      "data-rot": String(deg),
+      "aria-checked": String(state.options.rotation === deg),
+    },
   }),
 );
-const invertToggle = el("input", { id: "invert-toggle", type: "checkbox" });
-const statusBanner = el("div", {
-  id: "status-banner",
-  className: "status-banner",
-  text: "Ready for PDF input.",
+const rotationSegmented = el(
+  "div",
+  {
+    id: "rotation-group",
+    className: "segmented",
+    role: "radiogroup",
+    attrs: { "aria-label": "Page rotation" },
+  },
+  ...rotationButtons,
+);
+
+const densityValueEl = el("span", {
+  id: "density-value",
+  className: "value-pill",
+  text: `${state.density} / 5`,
+});
+const densitySlider = el("input", {
+  id: "density-slider",
+  type: "range",
+  className: "apple-range",
+  attrs: { min: "1", max: "5", step: "1", value: String(state.density) },
+});
+
+const copiesDecBtn = el("button", {
+  id: "copies-dec-btn",
+  type: "button",
+  className: "stepper-btn",
+  text: "−",
+  attrs: { "aria-label": "Decrease copies" },
+});
+const copiesInput = el("input", {
+  id: "copies-input",
+  type: "number",
+  className: "stepper-input",
+  attrs: {
+    min: "1",
+    max: String(MAX_SINGLE_PRINT_COPIES),
+    step: "1",
+    value: String(state.copies),
+    "aria-label": "Copies per sticker",
+  },
+});
+const copiesIncBtn = el("button", {
+  id: "copies-inc-btn",
+  type: "button",
+  className: "stepper-btn",
+  text: "+",
+  attrs: { "aria-label": "Increase copies" },
+});
+
+const invertToggle = el("input", {
+  id: "invert-toggle",
+  type: "checkbox",
+  className: "apple-switch",
+});
+const bleedGuidesToggle = el("input", {
+  id: "bleed-guides-toggle",
+  type: "checkbox",
+  className: "apple-switch",
+  checked: true,
 });
 
 const rasterPanel = el(
   "section",
-  { className: "panel", attrs: { "aria-label": "PDF and Raster Controls" } },
-  el("h2", { className: "panel-title", text: "PDF Source & 1-Bit Rasterization" }),
-  dropzone,
-  fileMetaEl,
+  { className: "panel", attrs: { "aria-label": "Raster and Thermal Engine" } },
   el(
     "div",
-    { className: "control-group" },
-    el("label", {
-      className: "control-label",
-      attrs: { for: "fit-mode" },
-      text: "Sizing Mode",
-    }),
-    fitModeSelect,
+    { className: "panel-title-row" },
+    el(
+      "div",
+      { className: "panel-heading" },
+      createIcon("sparkles", 17),
+      el("h2", { className: "panel-title", text: "Raster & Thermal Engine" }),
+    ),
   ),
   el(
     "div",
     { className: "control-group" },
-    el("label", {
-      className: "control-label",
-      attrs: { for: "dither-mode" },
-      text: "1-Bit Binarization Mode",
-    }),
-    ditherModeSelect,
+    el("span", { className: "control-label", text: "Sizing Mode" }),
+    fitModeSegmented,
+  ),
+  el(
+    "div",
+    { className: "control-group" },
+    el("span", { className: "control-label", text: "1-Bit Engine" }),
+    ditherModeSegmented,
   ),
   thresholdGroup,
   el(
     "div",
     { className: "control-group" },
     el("span", { className: "control-label", text: "Rotation" }),
-    el(
-      "div",
-      {
-        id: "rotation-group",
-        className: "rotation-group",
-        role: "group",
-        attrs: { "aria-label": "Page rotation" },
-      },
-      ...rotationButtons,
-    ),
+    rotationSegmented,
   ),
   el(
-    "label",
-    { className: "checkbox-row" },
-    invertToggle,
-    el("span", { text: "Invert polarity (white on black)" }),
+    "div",
+    { className: "control-group" },
+    el(
+      "div",
+      { className: "threshold-row" },
+      el("label", {
+        className: "control-label",
+        attrs: { for: "density-slider" },
+        text: "Thermal Density",
+      }),
+      densityValueEl,
+    ),
+    densitySlider,
   ),
-  statusBanner,
+  el(
+    "div",
+    { className: "stepper-row" },
+    el("label", {
+      className: "control-label",
+      attrs: { for: "copies-input" },
+      text: "Copies / Sticker",
+    }),
+    el("div", { className: "stepper" }, copiesDecBtn, copiesInput, copiesIncBtn),
+  ),
+  el(
+    "div",
+    { className: "toggles-group" },
+    el(
+      "label",
+      { className: "switch-row" },
+      el("span", { text: "Invert polarity (white on black)" }),
+      invertToggle,
+    ),
+    el(
+      "label",
+      { className: "switch-row" },
+      el("span", { text: "Show 1 mm margin hairlines" }),
+      bleedGuidesToggle,
+    ),
+  ),
 );
+
+// --- Right Main Canvas Stage ---
+const fileInput = el("input", {
+  id: "pdf-input",
+  type: "file",
+  className: "hidden-input",
+  attrs: { accept: "application/pdf,.pdf" },
+});
+const dropzone = el(
+  "div",
+  {
+    id: "dropzone",
+    className: "dropzone",
+    role: "button",
+    attrs: { tabindex: "0", "aria-label": "Select or drop PDF file" },
+  },
+  el("div", { className: "dropzone-icon-badge" }, createIcon("uploadPdf", 24)),
+  el(
+    "div",
+    { className: "dropzone-copy" },
+    el("div", { className: "dropzone-title", text: "Drop 50×50 mm PDF Label Sheet" }),
+    el("div", {
+      className: "dropzone-hint",
+      text: "Click to browse · Up to 25 MB / 100 pages · Local offline rendering",
+    }),
+  ),
+  fileInput,
+);
+
+const fileMetaEl = el("div", { id: "file-meta", className: "file-meta", text: "No PDF loaded" });
+const statusBanner = el("div", {
+  id: "status-banner",
+  className: "status-banner",
+  text: "Ready for PDF input.",
+});
 
 const pageCountBadge = el("span", {
   id: "page-count-badge",
-  className: "mono-value",
+  className: "value-pill",
   text: "0 pages",
 });
+
 const selectAllBtn = el("button", {
   id: "select-all-btn",
   type: "button",
-  className: "btn btn-sm",
+  className: "btn btn-quiet btn-sm",
   text: "Select All",
 });
 const selectNoneBtn = el("button", {
   id: "select-none-btn",
   type: "button",
-  className: "btn btn-sm",
-  text: "Clear Selection",
+  className: "btn btn-quiet btn-sm",
+  text: "Deselect",
 });
 const batchSummaryEl = el("span", {
   id: "batch-summary",
   className: "batch-summary",
   text: "0 selected",
 });
-const cancelBatchBtn = el("button", {
-  id: "cancel-batch-btn",
-  type: "button",
-  className: "btn btn-danger btn-sm is-hidden",
-  text: "Stop After Current Sticker",
-});
-const printBatchBtn = el("button", {
-  id: "print-batch-btn",
-  type: "button",
-  className: "btn btn-primary",
-  text: "Print All Pages (0 Stickers)",
-  disabled: true,
-});
+const cancelBatchBtn = el(
+  "button",
+  {
+    id: "cancel-batch-btn",
+    type: "button",
+    className: "btn btn-danger btn-sm is-hidden",
+  },
+  createIcon("stop", 14),
+  el("span", { text: "Stop After Current" }),
+);
+const printBatchBtnLabel = el("span", { text: "Print Selected (0)" });
+const printBatchBtn = el(
+  "button",
+  {
+    id: "print-batch-btn",
+    type: "button",
+    className: "btn btn-primary",
+    disabled: true,
+  },
+  createIcon("play", 15),
+  printBatchBtnLabel,
+);
+
 const batchToolbar = el(
   "div",
   { id: "batch-toolbar", className: "batch-toolbar is-hidden" },
   el("div", { className: "batch-toolbar-left" }, selectAllBtn, selectNoneBtn, batchSummaryEl),
   el("div", { className: "batch-toolbar-right" }, cancelBatchBtn, printBatchBtn),
 );
+
 const previewContainer = el("div", {
   id: "preview-container",
   className: "empty-state",
-  text: "Upload a single- or multi-page 50×50 mm PDF to preview 1-bit 384×400 px stickers and print individually or as a batch.",
+  text: "Drop a single- or multi-page 50×50 mm PDF above to inspect 1-bit 384×400 px stickers on silicone release liners.",
 });
 
-const previewPanel = el(
+const stagePanel = el(
   "section",
-  { className: "panel", attrs: { "aria-label": "Label Previews and Batch Queue" } },
+  { className: "panel stage-panel", attrs: { "aria-label": "Label Previews and Batch Queue" } },
+  dropzone,
+  el("div", { className: "stage-status-row" }, fileMetaEl, statusBanner),
   el(
     "div",
     { className: "preview-header" },
-    el("h2", { text: "50×50 mm Thermal Sticker Previews" }),
+    el("h2", { text: "50×50 mm Die-Cut Label Previews" }),
     pageCountBadge,
   ),
   batchToolbar,
   previewContainer,
 );
 
+// --- Bottom Collapsible Activity Console ---
+const logCountPill = el("span", {
+  id: "log-count-pill",
+  className: "value-pill",
+  text: "0 events",
+});
 const clearLogBtn = el("button", {
   id: "clear-log-btn",
   type: "button",
-  className: "btn btn-sm",
-  text: "Clear View",
+  className: "btn btn-quiet btn-sm",
+  text: "Clear",
 });
 const protocolLogEl = el("div", {
   id: "protocol-log",
@@ -652,13 +873,23 @@ const protocolLogEl = el("div", {
 });
 const protocolDrawer = el(
   "details",
-  { className: "protocol-drawer", attrs: { open: "" } },
-  el("summary", { text: "Live B1 Protocol & Batch Lifecycle Log" }),
+  { className: "protocol-drawer" },
+  el(
+    "summary",
+    {},
+    el(
+      "div",
+      { className: "drawer-summary-left" },
+      createIcon("terminal", 16),
+      el("span", { text: "Activity & Protocol Console" }),
+    ),
+    logCountPill,
+  ),
   el(
     "div",
     { className: "protocol-drawer-toolbar" },
     el("span", {
-      text: "Shows dynamic USB WebSerial / BLE GATT negotiation, pacing, RFID/Heartbeat, and B1PrintTask batch states.",
+      text: "WebSerial / BLE GATT negotiation, optical gap calibration, and B1PrintTask packet states.",
     }),
     clearLogBtn,
   ),
@@ -668,8 +899,8 @@ const protocolDrawer = el(
 const workspaceGrid = el(
   "main",
   { className: "workspace-grid" },
-  el("div", { className: "sidebar-stack" }, hardwarePanel, rasterPanel),
-  previewPanel,
+  el("aside", { className: "sidebar-stack" }, hardwarePanel, rasterPanel),
+  stagePanel,
 );
 
 const appShell = el("div", { className: "app-shell" }, topbar);
@@ -679,6 +910,7 @@ if (capabilityWarningNode) {
 appShell.append(workspaceGrid, protocolDrawer);
 appRoot.replaceChildren(appShell);
 
+// --- UI State & Render Helpers ---
 function setPdfStatus(message: string, isError = false): void {
   statusBanner.textContent = message;
   statusBanner.classList.toggle("is-error", isError);
@@ -699,10 +931,18 @@ function appendLogEntry(entry: ProtocolLogEntry): void {
   line.textContent = `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`;
   protocolLogEl.append(line);
   protocolLogEl.scrollTop = protocolLogEl.scrollHeight;
+  state.logCount++;
+  logCountPill.textContent = `${state.logCount} ${state.logCount === 1 ? "event" : "events"}`;
 }
 
 function getSelectedPages(): RenderedLabelPage[] {
   return state.pages.filter((p) => state.selectedPageNumbers.has(p.pageNumber));
+}
+
+function syncCopiesStepper(): void {
+  copiesInput.value = String(state.copies);
+  copiesDecBtn.disabled = state.copies <= 1;
+  copiesIncBtn.disabled = state.copies >= MAX_SINGLE_PRINT_COPIES;
 }
 
 function syncPrintAndBatchControls(): void {
@@ -713,11 +953,14 @@ function syncPrintAndBatchControls(): void {
   const cardButtons = document.querySelectorAll<HTMLButtonElement>(".card-print-btn");
   for (const btn of cardButtons) {
     btn.disabled = !isReady;
-    btn.textContent = isPrinting
-      ? "Printing..."
-      : pState === "ready"
-        ? "Print This Sticker (5×5 cm)"
-        : "Connect B1 to Print";
+    const labelSpan = btn.querySelector<HTMLSpanElement>(".card-print-btn-label");
+    if (labelSpan) {
+      labelSpan.textContent = isPrinting
+        ? "Printing..."
+        : pState === "ready"
+          ? "Print Sticker"
+          : "Connect B1";
+    }
   }
 
   const cardChecks = document.querySelectorAll<HTMLInputElement>(".card-batch-check");
@@ -734,22 +977,25 @@ function syncPrintAndBatchControls(): void {
   const selectedCount = getSelectedPages().length;
   const totalStickers = selectedCount * state.copies;
 
-  batchSummaryEl.textContent = `${selectedCount}/${state.pages.length} pages selected · ${totalStickers} ${totalStickers === 1 ? "sticker" : "stickers"}`;
+  batchSummaryEl.textContent = `${selectedCount}/${state.pages.length} selected · ${totalStickers} ${totalStickers === 1 ? "sticker" : "stickers"}`;
   selectAllBtn.disabled = isPrinting || selectedCount === state.pages.length;
   selectNoneBtn.disabled = isPrinting || selectedCount === 0;
 
   const isAllSelected = selectedCount === state.pages.length;
   printBatchBtn.disabled = !isReady || selectedCount === 0;
-  printBatchBtn.textContent = isAllSelected
-    ? `Print All Pages (${totalStickers} ${totalStickers === 1 ? "Sticker" : "Stickers"})`
-    : `Print Selected (${totalStickers} ${totalStickers === 1 ? "Sticker" : "Stickers"})`;
+  printBatchBtnLabel.textContent = isAllSelected
+    ? `Print All (${totalStickers})`
+    : `Print Selected (${totalStickers})`;
 
   const showCancel = activeBatchAbort !== null && isPrinting;
   cancelBatchBtn.classList.toggle("is-hidden", !showCancel);
   cancelBatchBtn.disabled = activeBatchAbort?.signal.aborted ?? true;
-  cancelBatchBtn.textContent = activeBatchAbort?.signal.aborted
-    ? "Stopping After Sticker..."
-    : "Stop After Current Sticker";
+  const cancelLabel = cancelBatchBtn.querySelector("span");
+  if (cancelLabel) {
+    cancelLabel.textContent = activeBatchAbort?.signal.aborted
+      ? "Stopping..."
+      : "Stop After Current";
+  }
 }
 
 function updateHardwareUi(snap: PrinterTelemetrySnapshot): void {
@@ -768,19 +1014,16 @@ function updateHardwareUi(snap: PrinterTelemetrySnapshot): void {
   }
 
   if (isConnected) {
-    const badgePrefix =
-      snap.transport === "ble"
-        ? `Bluetooth BLE Connected: ${snap.deviceName ?? "B1"}`
-        : `USB Serial Connected: ${snap.deviceName ?? "B1"}`;
-    hwBadgeText.textContent =
-      snap.state === "ready" ? badgePrefix : `${badgePrefix} (${snap.state.toUpperCase()})`;
+    const linkName = snap.transport === "ble" ? "BLE" : "USB-C";
+    const battTag = snap.batteryPct !== null ? ` · ${snap.batteryPct}%` : "";
+    const statusTag = snap.state === "ready" ? "Ready" : snap.state.toUpperCase();
+    hwBadgeText.textContent = `${snap.deviceName ?? "Niimbot B1"} (${linkName}${battTag}) · ${statusTag}`;
   } else if (snap.state === "connecting") {
-    hwBadgeText.textContent =
-      snap.transport === "ble" ? "Scanning Bluetooth BLE..." : "Opening USB Serial...";
+    hwBadgeText.textContent = snap.transport === "ble" ? "Scanning BLE..." : "Connecting USB-C...";
   } else if (snap.state === "error") {
-    hwBadgeText.textContent = "Printer: Error";
+    hwBadgeText.textContent = "Printer Error";
   } else {
-    hwBadgeText.textContent = "Printer: Disconnected";
+    hwBadgeText.textContent = "Disconnected";
     if (snap.lastError) {
       setHwStatus(snap.lastError, true);
     }
@@ -927,78 +1170,90 @@ function renderPreviewCards(): void {
   if (state.pages.length === 0) {
     previewContainer.className = "empty-state";
     previewContainer.textContent =
-      "Upload a single- or multi-page 50×50 mm PDF to preview 1-bit 384×400 px stickers and print individually or as a batch.";
+      "Drop a single- or multi-page 50×50 mm PDF above to inspect 1-bit 384×400 px stickers on silicone release liners.";
     syncPrintAndBatchControls();
     return;
   }
 
-  previewContainer.className = "preview-grid";
+  previewContainer.className = state.showBleedGuides
+    ? "preview-grid"
+    : "preview-grid hide-bleed-guides";
   previewContainer.replaceChildren();
 
   for (const page of state.pages) {
     const isChecked = state.selectedPageNumbers.has(page.pageNumber);
     const card = document.createElement("article");
-    card.className = `sticker-card${isChecked ? "" : " is-excluded"}`;
+    card.className = `sticker-card${isChecked ? " is-selected" : " is-excluded"}`;
 
     const head = document.createElement("div");
     head.className = "sticker-card-head";
 
-    const selectLabel = document.createElement("label");
-    selectLabel.className = "checkbox-row";
+    const selectPill = document.createElement("label");
+    selectPill.className = `sticker-select-pill${isChecked ? " is-checked" : ""}`;
     const check = document.createElement("input");
     check.type = "checkbox";
-    check.className = "card-batch-check";
+    check.className = "card-batch-check hidden-input";
     check.checked = isChecked;
+    const checkBoxBadge = el("span", { className: "select-check-circle" }, createIcon("check", 12));
+    const title = el("span", { text: `Page ${page.pageNumber}` });
+    selectPill.append(check, checkBoxBadge, title);
+
     check.addEventListener("change", () => {
       if (check.checked) {
         state.selectedPageNumbers.add(page.pageNumber);
       } else {
         state.selectedPageNumbers.delete(page.pageNumber);
       }
+      selectPill.classList.toggle("is-checked", check.checked);
+      card.classList.toggle("is-selected", check.checked);
       card.classList.toggle("is-excluded", !check.checked);
       syncPrintAndBatchControls();
     });
-    const title = document.createElement("span");
-    title.textContent = `Page ${page.pageNumber}`;
-    selectLabel.append(check, title);
 
     const sizePill = document.createElement("span");
     sizePill.className = `pill ${page.isExpected50x50Mm ? "pill-ok" : "pill-warn"}`;
     sizePill.textContent = page.isExpected50x50Mm
       ? `${page.sourceWidthMm.toFixed(1)}×${page.sourceHeightMm.toFixed(1)} mm`
       : `Non-50mm: ${page.sourceWidthMm.toFixed(1)}×${page.sourceHeightMm.toFixed(1)} mm`;
-    head.append(selectLabel, sizePill);
+    head.append(selectPill, sizePill);
 
     const frame = document.createElement("div");
     frame.className = "sticker-frame";
-    frame.title = "Dashed bands indicate 1 mm (8 px) unprintable left/right margins";
+    frame.title = "Hairline side bands mark 1 mm (8 px) unprintable thermal margins";
     page.canvas.className = "sticker-canvas";
     frame.append(page.canvas);
+
+    const liner = document.createElement("div");
+    liner.className = "sticker-liner";
+    liner.append(frame);
 
     const meta = document.createElement("div");
     meta.className = "sticker-meta";
 
-    const outputDim = document.createElement("div");
-    outputDim.textContent = `Canvas: ${page.widthPx}×${page.heightPx} px (1-bit)`;
-
-    const encoderInfo = document.createElement("div");
-    encoderInfo.textContent = `ImageEncoder: ${page.encodedImage.cols}×${page.encodedImage.rows} · ${page.encodedImage.rowsData.length} packets`;
-
-    const inkInfo = document.createElement("div");
     const totalPixels = page.widthPx * page.heightPx;
     const coveragePct = ((page.blackPixelsCount / totalPixels) * 100).toFixed(1);
-    inkInfo.textContent = `Black dots: ${page.blackPixelsCount.toLocaleString()} (${coveragePct}%)`;
 
-    meta.append(outputDim, encoderInfo, inkInfo);
+    meta.append(
+      el("div", {
+        text: `${page.widthPx}×${page.heightPx} px · 203 DPI · ${page.encodedImage.rowsData.length} pkts`,
+      }),
+      el("div", { text: `Ink: ${page.blackPixelsCount.toLocaleString()} dots (${coveragePct}%)` }),
+    );
 
-    const printBtn = document.createElement("button");
-    printBtn.type = "button";
-    printBtn.className = "btn btn-primary card-print-btn";
+    const printBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-primary card-print-btn",
+      },
+      createIcon("printer", 15),
+      el("span", { className: "card-print-btn-label", text: "Print Sticker" }),
+    );
     printBtn.addEventListener("click", () => {
       void handlePrintSinglePage(page);
     });
 
-    card.append(head, frame, meta, printBtn);
+    card.append(head, liner, meta, printBtn);
     previewContainer.append(card);
   }
 
@@ -1027,7 +1282,7 @@ async function runRasterPipeline(resetSelection = false): Promise<void> {
     state.isRendering = false;
     renderPreviewCards();
     setPdfStatus(
-      `Rendered ${renderedPages.length} label ${renderedPages.length === 1 ? "page" : "pages"} (ImageEncoder verified).`,
+      `Rendered ${renderedPages.length} ${renderedPages.length === 1 ? "label" : "labels"} (384×400 1-bit verified).`,
     );
   } catch (err) {
     if (currentSeq !== renderSeq) {
@@ -1066,12 +1321,27 @@ async function handleSelectedFile(file: File): Promise<void> {
   await runRasterPipeline(true);
 }
 
-// Subscribe to B1 controller events
+// --- Subscriptions & Event Listeners ---
 printer.onLog(appendLogEntry);
 printer.onStateChange(updateHardwareUi);
 printer.onProgress(updateProgressUi);
 
-// PWA Desktop Install prompt + Offline Service Worker registration
+for (const btn of themeButtons) {
+  btn.addEventListener("click", () => {
+    const mode = btn.dataset.themeMode;
+    if (mode !== "light" && mode !== "auto" && mode !== "dark") {
+      return;
+    }
+    state.themeMode = mode;
+    applyThemeMode(mode);
+    for (const item of themeButtons) {
+      const active = item === btn;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-checked", String(active));
+    }
+  });
+}
+
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
@@ -1094,22 +1364,21 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   });
 }
 
-// Hardware UI listeners
 usbFilterToggle.addEventListener("change", () => {
   state.filterKnownUsbVendors = usbFilterToggle.checked;
 });
 
 connectUsbBtn.addEventListener("click", async () => {
-  setHwStatus("Opening WebSerial picker (select the Niimbot B1 USB Serial Device on this PC)...");
+  setHwStatus("Opening WebSerial picker (select Niimbot B1 USB Serial Device)...");
   try {
     const connected = await printer.connectUsb({
       filterKnownVendors: state.filterKnownUsbVendors,
     });
-    if (connected) {
-      setHwStatus("USB Serial Connected — ready to print 50×50 mm gap labels.");
-    } else {
-      setHwStatus("USB-C connection cancelled.");
-    }
+    setHwStatus(
+      connected
+        ? "USB Serial Connected — ready to print 50×50 mm gap labels."
+        : "USB-C connection cancelled.",
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     setHwStatus(msg, true);
@@ -1117,16 +1386,14 @@ connectUsbBtn.addEventListener("click", async () => {
 });
 
 connectBleBtn.addEventListener("click", async () => {
-  setHwStatus(
-    "Scanning Bluetooth BLE (ensure PC USB-C cable is unplugged from B1 and select B1-...)...",
-  );
+  setHwStatus("Scanning Bluetooth BLE (unplug PC USB-C cable from B1 and select B1-...)...");
   try {
     const connected = await printer.connectBle();
-    if (connected) {
-      setHwStatus("Bluetooth BLE Connected — wireless packet pacing (20ms) active.");
-    } else {
-      setHwStatus("Bluetooth BLE connection cancelled.");
-    }
+    setHwStatus(
+      connected
+        ? "Bluetooth BLE Connected — 20ms wireless packet pacing active."
+        : "Bluetooth BLE connection cancelled.",
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     setHwStatus(msg, true);
@@ -1158,12 +1425,19 @@ densitySlider.addEventListener("input", () => {
   densityValueEl.textContent = `${val} / 5`;
 });
 
-copiesInput.addEventListener("change", () => {
-  const parsed = Number.parseInt(copiesInput.value, 10);
-  const clamped = Number.isFinite(parsed) ? Math.max(1, Math.min(20, parsed)) : 1;
+function setCopies(nextVal: number): void {
+  const clamped = Number.isFinite(nextVal)
+    ? Math.max(1, Math.min(MAX_SINGLE_PRINT_COPIES, Math.round(nextVal)))
+    : 1;
   state.copies = clamped;
-  copiesInput.value = String(clamped);
+  syncCopiesStepper();
   syncPrintAndBatchControls();
+}
+
+copiesDecBtn.addEventListener("click", () => setCopies(state.copies - 1));
+copiesIncBtn.addEventListener("click", () => setCopies(state.copies + 1));
+copiesInput.addEventListener("change", () => {
+  setCopies(Number.parseInt(copiesInput.value, 10));
 });
 
 feedGapBtn.addEventListener("click", async () => {
@@ -1178,7 +1452,7 @@ feedGapBtn.addEventListener("click", async () => {
 });
 
 calibrateSensorBtn.addEventListener("click", async () => {
-  setHwStatus("Running B1 optical gap calibration (0x8E — feeds ~2-3 labels)...");
+  setHwStatus("Running B1 optical gap calibration (0x8E — feeds ~2–3 labels)...");
   try {
     await printer.calibrateGapSensor(state.labelType);
     setHwStatus("Optical gap sensor calibration finished.");
@@ -1188,7 +1462,6 @@ calibrateSensorBtn.addEventListener("click", async () => {
   }
 });
 
-// Batch toolbar listeners
 selectAllBtn.addEventListener("click", () => {
   state.selectedPageNumbers = new Set(state.pages.map((p) => p.pageNumber));
   renderPreviewCards();
@@ -1212,9 +1485,10 @@ cancelBatchBtn.addEventListener("click", () => {
 
 clearLogBtn.addEventListener("click", () => {
   protocolLogEl.replaceChildren();
+  state.logCount = 0;
+  logCountPill.textContent = "0 events";
 });
 
-// PDF & Rasterizer UI listeners
 dropzone.addEventListener("click", () => fileInput.click());
 dropzone.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
@@ -1248,16 +1522,32 @@ fileInput.addEventListener("change", () => {
   }
 });
 
-fitModeSelect.addEventListener("change", () => {
-  state.options.fitMode = parseFitMode(fitModeSelect.value);
-  void runRasterPipeline(false);
-});
+for (const btn of fitModeButtons) {
+  btn.addEventListener("click", () => {
+    const nextFit: FitMode = btn.dataset.fitMode === "crop-bleed" ? "crop-bleed" : "fit";
+    state.options.fitMode = nextFit;
+    for (const item of fitModeButtons) {
+      const active = item === btn;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-checked", String(active));
+    }
+    void runRasterPipeline(false);
+  });
+}
 
-ditherModeSelect.addEventListener("change", () => {
-  state.options.ditherMode = parseDitherMode(ditherModeSelect.value);
-  updateThresholdVisibility();
-  void runRasterPipeline(false);
-});
+for (const btn of ditherModeButtons) {
+  btn.addEventListener("click", () => {
+    const nextDither: DitherMode = btn.dataset.ditherMode === "atkinson" ? "atkinson" : "threshold";
+    state.options.ditherMode = nextDither;
+    for (const item of ditherModeButtons) {
+      const active = item === btn;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-checked", String(active));
+    }
+    updateThresholdVisibility();
+    void runRasterPipeline(false);
+  });
+}
 
 thresholdSlider.addEventListener("input", () => {
   const value = Number.parseInt(thresholdSlider.value, 10);
@@ -1268,10 +1558,14 @@ thresholdSlider.addEventListener("input", () => {
 
 for (const btn of rotationButtons) {
   btn.addEventListener("click", () => {
-    const rot = parseRotation(btn.dataset.rot);
-    state.options.rotation = rot;
+    const raw = btn.dataset.rot;
+    const nextRot: RotationDegrees =
+      raw === "90" ? 90 : raw === "180" ? 180 : raw === "270" ? 270 : 0;
+    state.options.rotation = nextRot;
     for (const item of rotationButtons) {
-      item.classList.toggle("is-active", item === btn);
+      const active = item === btn;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-checked", String(active));
     }
     void runRasterPipeline(false);
   });
@@ -1282,4 +1576,12 @@ invertToggle.addEventListener("change", () => {
   void runRasterPipeline(false);
 });
 
+bleedGuidesToggle.addEventListener("change", () => {
+  state.showBleedGuides = bleedGuidesToggle.checked;
+  if (state.pages.length > 0) {
+    previewContainer.classList.toggle("hide-bleed-guides", !state.showBleedGuides);
+  }
+});
+
 updateThresholdVisibility();
+syncCopiesStepper();

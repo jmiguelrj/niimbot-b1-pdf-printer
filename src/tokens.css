@@ -1,115 +1,152 @@
-:root {
-  color-scheme: light dark;
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
 
-  /* Surfaces & Glass */
-  --nb-bg: #f4f5f7;
+  /* Primary Brand Accent (#FA4676) */
+  --nb-accent: #fa4676;
+  --nb-accent-hover: #e83565;
+  --nb-accent-active: #d42856;
+  --nb-accent-soft: rgba(250, 70, 118, 0.12);
+  --nb-accent-soft-hover: rgba(250, 70, 118, 0.18);
+  --nb-accent-border: rgba(250, 70, 118, 0.34);
+  --nb-accent-glow: 0 6px 20px -4px rgba(250, 70, 118, 0.42);
+  --nb-on-accent: #ffffff;
+  --nb-focus-ring: 0 0 0 3px rgba(250, 70, 118, 0.22), 0 0 0 1.5px #fa4676;
+
+  /* Apple Neutral Surfaces, Vibrancy & Hairlines */
+  --nb-bg: #f5f5f7;
   --nb-surface: #ffffff;
-  --nb-surface-alt: #f8fafc;
-  --nb-glass-bg: rgba(255, 255, 255, 0.78);
-  --nb-glass-blur: 14px;
+  --nb-surface-alt: #f2f2f7;
+  --nb-surface-elevated: #ffffff;
+  --nb-segmented-track: rgba(118, 118, 128, 0.12);
+  --nb-segmented-thumb: #ffffff;
+  --nb-segmented-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.06);
+  --nb-glass-bg: rgba(255, 255, 255, 0.76);
+  --nb-glass-blur: 24px;
+  --nb-border: rgba(0, 0, 0, 0.08);
+  --nb-border-strong: rgba(0, 0, 0, 0.14);
+  --nb-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -6px rgba(0, 0, 0, 0.06);
+  --nb-shadow-sticker: 0 2px 6px rgba(0, 0, 0, 0.06), 0 10px 22px -6px rgba(0, 0, 0, 0.12);
 
-  /* Borders & Elevation */
-  --nb-border: #d5d9e2;
-  --nb-sticker-border: #9ca3af;
-  --nb-shadow-sticker: 0 2px 8px rgba(0, 0, 0, 0.08);
+  /* Typography & Motion */
+  --nb-text: #1d1d1f;
+  --nb-text-muted: #6e6e73;
+  --nb-text-tertiary: #86868b;
+  --nb-font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui,
+    sans-serif;
+  --nb-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --nb-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Typography & Ink */
-  --nb-text: #111827;
-  --nb-text-muted: #4b5563;
-  --nb-text-on-accent: #ffffff;
-  --nb-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --nb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-  /* Accents & Interactive */
-  --nb-accent: #0f62fe;
-  --nb-accent-hover: #0043ce;
-  --nb-accent-soft: rgba(15, 98, 254, 0.1);
-  --nb-danger: #dc2626;
-  --nb-danger-hover: #b91c1c;
-
-  /* Status Dots */
-  --nb-dot-idle: #9ca3af;
-  --nb-dot-ready: #10b981;
-  --nb-dot-ready-ring: rgba(16, 185, 129, 0.2);
-  --nb-dot-busy: #f59e0b;
-  --nb-dot-busy-ring: rgba(245, 158, 11, 0.25);
-  --nb-dot-error: #ef4444;
-
-  /* Semantic Banners & Pills */
-  --nb-warn-bg: #fff8e1;
-  --nb-warn-border: #f59e0b;
-  --nb-warn-text: #92400e;
-  --nb-ok-bg: #ecfdf5;
-  --nb-ok-border: #10b981;
-  --nb-ok-text: #065f46;
-  --nb-err-bg: rgba(239, 68, 68, 0.1);
-  --nb-err-border: #ef4444;
-  --nb-err-text: #dc2626;
-
-  /* Physical Sticker Preview & Bleed Guides */
-  --nb-sticker-paper: #ffffff;
-  --nb-bleed-stripe: rgba(239, 68, 68, 0.12);
-  --nb-bleed-border: rgba(239, 68, 68, 0.55);
-
-  /* Protocol Console */
-  --nb-log-bg: #0d1117;
-  --nb-log-text: #d1d5db;
-  --nb-log-warn: #fbbf24;
-  --nb-log-error: #f87171;
-
-  /* Radii */
-  --nb-radius-sm: 6px;
-  --nb-radius-md: 8px;
-  --nb-radius-lg: 10px;
+  /* Concentric Apple Squircle Radii */
+  --nb-radius-xs: 8px;
+  --nb-radius-sm: 10px;
+  --nb-radius-md: 14px;
+  --nb-radius-lg: 20px;
+  --nb-radius-xl: 26px;
   --nb-radius-pill: 999px;
+
+  /* Apple Semantic Colors */
+  --nb-danger: #ff3b30;
+  --nb-danger-hover: #e02e24;
+  --nb-dot-idle: #8e8e93;
+  --nb-dot-ready: #34c759;
+  --nb-dot-ready-ring: rgba(52, 199, 89, 0.22);
+  --nb-dot-busy: #ff9f0a;
+  --nb-dot-busy-ring: rgba(255, 159, 10, 0.26);
+  --nb-dot-error: #ff3b30;
+  --nb-warn-bg: rgba(255, 159, 10, 0.12);
+  --nb-warn-border: rgba(255, 159, 10, 0.35);
+  --nb-warn-text: #9a5b00;
+  --nb-ok-bg: rgba(52, 199, 89, 0.12);
+  --nb-ok-border: rgba(52, 199, 89, 0.32);
+  --nb-ok-text: #157333;
+  --nb-err-bg: rgba(255, 59, 48, 0.1);
+  --nb-err-border: rgba(255, 59, 48, 0.32);
+  --nb-err-text: #c9231b;
+
+  /* Physical Sticker Liner Backing & Bleed Guides */
+  --nb-liner-bg: #eaeaef;
+  --nb-liner-border: rgba(0, 0, 0, 0.07);
+  --nb-sticker-paper: #ffffff;
+  --nb-sticker-border: rgba(0, 0, 0, 0.12);
+  --nb-bleed-stripe: rgba(250, 70, 118, 0.1);
+  --nb-bleed-border: rgba(250, 70, 118, 0.45);
+
+  /* Activity Console & Sliders */
+  --nb-log-bg: #141416;
+  --nb-log-text: #e5e5ea;
+  --nb-log-warn: #ffd60a;
+  --nb-log-error: #ff453a;
+  --nb-slider-track: rgba(120, 120, 128, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --nb-bg: #0f1117;
-    --nb-surface: #171a23;
-    --nb-surface-alt: #1f2430;
-    --nb-glass-bg: rgba(23, 26, 35, 0.78);
-    --nb-border: #2c3344;
-    --nb-text: #f3f4f6;
-    --nb-text-muted: #9ca3af;
-    --nb-accent: #3b82f6;
-    --nb-accent-hover: #2563eb;
-    --nb-accent-soft: rgba(59, 130, 246, 0.16);
-    --nb-danger: #ef4444;
-    --nb-danger-hover: #dc2626;
-    --nb-warn-bg: rgba(245, 158, 11, 0.15);
-    --nb-warn-border: #d97706;
-    --nb-warn-text: #fcd34d;
-    --nb-ok-bg: rgba(16, 185, 129, 0.14);
-    --nb-ok-border: #10b981;
-    --nb-ok-text: #6ee7b7;
-    --nb-err-bg: rgba(239, 68, 68, 0.16);
-    --nb-err-border: #f87171;
-    --nb-err-text: #fca5a5;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --nb-bg: #0b0b0d;
+    --nb-surface: #1c1c1e;
+    --nb-surface-alt: #2c2c2e;
+    --nb-surface-elevated: #242426;
+    --nb-segmented-track: rgba(118, 118, 128, 0.28);
+    --nb-segmented-thumb: #3a3a3c;
+    --nb-segmented-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0.5px 1px rgba(0, 0, 0, 0.4);
+    --nb-glass-bg: rgba(28, 28, 30, 0.76);
+    --nb-border: rgba(255, 255, 255, 0.1);
+    --nb-border-strong: rgba(255, 255, 255, 0.18);
+    --nb-text: #f5f5f7;
+    --nb-text-muted: #a1a1a6;
+    --nb-text-tertiary: #8e8e93;
+    --nb-accent: #fa4676;
+    --nb-accent-hover: #ff5c88;
+    --nb-accent-active: #e83565;
+    --nb-accent-soft: rgba(250, 70, 118, 0.2);
+    --nb-accent-soft-hover: rgba(250, 70, 118, 0.28);
+    --nb-danger: #ff453a;
+    --nb-danger-hover: #ff6259;
+    --nb-dot-ready: #30d158;
+    --nb-dot-ready-ring: rgba(48, 209, 88, 0.25);
+    --nb-warn-text: #ffd60a;
+    --nb-ok-text: #30d158;
+    --nb-err-text: #ff6961;
+    --nb-liner-bg: #141416;
+    --nb-liner-border: rgba(255, 255, 255, 0.08);
+    --nb-shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35), 0 12px 28px -8px rgba(0, 0, 0, 0.45);
+    --nb-shadow-sticker: 0 4px 14px rgba(0, 0, 0, 0.45), 0 12px 26px -6px rgba(0, 0, 0, 0.55);
+    --nb-slider-track: rgba(255, 255, 255, 0.16);
   }
 }
 
 :root[data-theme="dark"] {
-  --nb-bg: #0f1117;
-  --nb-surface: #171a23;
-  --nb-surface-alt: #1f2430;
-  --nb-glass-bg: rgba(23, 26, 35, 0.78);
-  --nb-border: #2c3344;
-  --nb-text: #f3f4f6;
-  --nb-text-muted: #9ca3af;
-  --nb-accent: #3b82f6;
-  --nb-accent-hover: #2563eb;
-  --nb-accent-soft: rgba(59, 130, 246, 0.16);
-  --nb-danger: #ef4444;
-  --nb-danger-hover: #dc2626;
-  --nb-warn-bg: rgba(245, 158, 11, 0.15);
-  --nb-warn-border: #d97706;
-  --nb-warn-text: #fcd34d;
-  --nb-ok-bg: rgba(16, 185, 129, 0.14);
-  --nb-ok-border: #10b981;
-  --nb-ok-text: #6ee7b7;
-  --nb-err-bg: rgba(239, 68, 68, 0.16);
-  --nb-err-border: #f87171;
-  --nb-err-text: #fca5a5;
+  color-scheme: dark;
+  --nb-bg: #0b0b0d;
+  --nb-surface: #1c1c1e;
+  --nb-surface-alt: #2c2c2e;
+  --nb-surface-elevated: #242426;
+  --nb-segmented-track: rgba(118, 118, 128, 0.28);
+  --nb-segmented-thumb: #3a3a3c;
+  --nb-segmented-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0.5px 1px rgba(0, 0, 0, 0.4);
+  --nb-glass-bg: rgba(28, 28, 30, 0.76);
+  --nb-border: rgba(255, 255, 255, 0.1);
+  --nb-border-strong: rgba(255, 255, 255, 0.18);
+  --nb-text: #f5f5f7;
+  --nb-text-muted: #a1a1a6;
+  --nb-text-tertiary: #8e8e93;
+  --nb-accent: #fa4676;
+  --nb-accent-hover: #ff5c88;
+  --nb-accent-active: #e83565;
+  --nb-accent-soft: rgba(250, 70, 118, 0.2);
+  --nb-accent-soft-hover: rgba(250, 70, 118, 0.28);
+  --nb-danger: #ff453a;
+  --nb-danger-hover: #ff6259;
+  --nb-dot-ready: #30d158;
+  --nb-dot-ready-ring: rgba(48, 209, 88, 0.25);
+  --nb-warn-text: #ffd60a;
+  --nb-ok-text: #30d158;
+  --nb-err-text: #ff6961;
+  --nb-liner-bg: #141416;
+  --nb-liner-border: rgba(255, 255, 255, 0.08);
+  --nb-shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35), 0 12px 28px -8px rgba(0, 0, 0, 0.45);
+  --nb-shadow-sticker: 0 4px 14px rgba(0, 0, 0, 0.45), 0 12px 26px -6px rgba(0, 0, 0, 0.55);
+  --nb-slider-track: rgba(255, 255, 255, 0.16);
 }

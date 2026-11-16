@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import test from "node:test";
 import {
   MAX_PDF_BYTES,
@@ -39,4 +40,11 @@ test("verify-guardrails.mjs exits cleanly with code 0", () => {
     encoding: "utf8",
   });
   assert.match(stdout, /Guardrails PASSED/);
+});
+
+test("Apple Cupertino #FA4676 brand accent token and manifest theme_color are locked", () => {
+  const tokensCss = fs.readFileSync("src/tokens.css", "utf8");
+  const manifest = fs.readFileSync("public/manifest.webmanifest", "utf8");
+  assert.match(tokensCss, /--nb-accent:\s*#fa4676\b/i);
+  assert.match(manifest, /"theme_color":\s*"#fa4676"/i);
 });

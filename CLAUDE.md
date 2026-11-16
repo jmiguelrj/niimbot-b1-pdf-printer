@@ -16,9 +16,11 @@ Local-first, zero-driver 50×50 mm PDF thermal label printer web application (Vi
 - **Strict CSP**: `index.html` enforces `style-src 'self'` and `script-src 'self'`. Do NOT write inline `style=` attributes or `.style.*` mutations; toggle CSS classes or `<progress>` elements instead.
 - **PDF Safety Bounds**: Enforce `MAX_PDF_BYTES = 25 MB`, `%PDF-` magic header check (`validatePdfBytes`), `MAX_PDF_PAGES = 100` (`validatePdfPageCount`), `enableScripting: false`, and `enableXfa: false`.
 
-## Design Token Architecture
+## Design Token Architecture & UI Icons
 - All colors, glass blur, shadows, typography, and radii live in `src/tokens.css` under canonical `--nb-*` custom properties.
+- `--nb-accent: #FA4676` is the locked primary brand accent token (`src/tokens.css` & `public/manifest.webmanifest`).
 - Other CSS files (`src/style.css`) MUST `@import "./tokens.css"` and use ONLY `var(--nb-*)` — zero raw `#hex`, `rgb()`, `rgba()`, `hsl()`, or `hsla()` literals outside `src/tokens.css`.
+- Vector icons live in `src/ui/icons.ts` and are built strictly via `document.createElementNS("http://www.w3.org/2000/svg", ...)` (zero `innerHTML`, space-separated SVG path coordinates).
 
 ## Mandatory Pre-Commit Verification Gate
 Before any commit or PR, run and pass:

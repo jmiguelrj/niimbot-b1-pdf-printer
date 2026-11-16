@@ -4,5 +4,5 @@
 2. Zero-driver portability: Never hardcode `COM9` or host-specific paths in `src/`. Keep `vite.config.ts` `base: "./"` for subpath and PWA portability.
 3. Security locks: Never introduce `innerHTML`, `outerHTML`, `eval`, `Function`, `any`, inline `style=` / `.style.*`, or remove PDF.js bounds (`MAX_PDF_BYTES`, `MAX_PDF_PAGES`, `%PDF-` header, `enableScripting: false`).
 4. Public-repo locks: Never write private infrastructure IPs, credentials, tokens, or SSH targets into tracked files (`scripts/verify-guardrails.mjs` blocks commits).
-5. Token purity: Define colors/radii/shadows exclusively as `--nb-*` tokens in `src/tokens.css`. Never put raw hex/rgb/hsl literals in `src/style.css`.
+5. Token purity & brand lock: Define colors/radii/shadows exclusively as `--nb-*` tokens in `src/tokens.css` (with `--nb-accent: #FA4676` locked as primary brand accent). Never put raw hex/rgb/hsl literals in `src/style.css`. Build SVG icons via `src/ui/icons.ts` (`document.createElementNS`, zero `innerHTML`).
 6. Verification gate: Every code edit must pass `npm run check` and `npm run build` with exit code `0`.
