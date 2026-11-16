@@ -9,7 +9,8 @@
 | **Task #5** | `COMPLETED` | Multi-PC x64/ARM64 dynamic USB + Windows BLE pacing hardening, multi-page PDF batch printing (`AbortController`), zero-dependency Offline PWA (`sw.js` + `manifest.webmanifest`), GitHub Pages HTTPS CI/CD & merge to `main` | `vite.config.ts` (`base: "./"`), `public/manifest.webmanifest`, `public/pwa-icon.svg`, `.github/workflows/deploy-pages.yml`, `docs/SOP-004-MULTI-PC-AND-BLUETOOTH-DEPLOYMENT.md`; `npx tsc --noEmit` exits `0`; `npm run build` emits `dist/sw.js` (0 npm vulns); 10/10 unit tests pass; merged to `main` |
 | **Task #6** | `COMPLETED` | Read-only security, public-repo readiness & proxy routing discovery audit | `npm audit` 0 vulns; identified missing `LICENSE`, `appRoot.innerHTML`, unbounded PDF size/pages, and missing CSP; confirmed production reverse proxy routing requirements with zero local/remote mutations |
 | **Task #7** | `COMPLETED` | Security hardening, MIT `LICENSE`, `--nb-*` design tokens (`src/tokens.css`), `@biomejs/biome`, `scripts/verify-guardrails.mjs`, `CLAUDE.md`, `.antigravityrules`, pre-commit hook & CI gate | `npm audit` 0 vulns; `npm run check` (Biome + `tsc` + `verify:guardrails` + 13/13 tests) exits `0`; `npm run build` exits `0`; `docs/SOP-005-SECURITY-AND-AGENTIC-GUARDRAILS.md` created & merged to `main` |
-| **Task #8** | `COMPLETED` | Apple macOS Sonoma / iPadOS Print Center UI/UX redesign with `#FA4676` brand accent, Light/Auto/Dark switcher & pure-DOM SVG icon factory | `src/tokens.css`, `src/style.css`, `src/ui/icons.ts`, `src/main.ts`, updated PWA squircle icons/manifest; `npm audit` 0 vulns; `npm run check` & `npm run build` exit `0` |
+| **Task #8** | `COMPLETED` | Apple Cupertino Print-Center UI/UX redesign (`#FA4676` accent, Light/Auto/Dark modes & pure-DOM SVG icons) | `src/tokens.css`, `src/style.css`, `src/ui/icons.ts`, `src/main.ts`, updated PWA squircle icons/manifest; `npm audit` 0 vulns; `npm run check` (15/15 tests) & `npm run build` exit `0` |
+| **Task #9** | `COMPLETED` | Public showcase `README.md`, `SOP-006` subpath reverse-proxy guide, `v1.0.0` release tag & zero-downtime `nginx:1.27-alpine` / Traefik `/labels/` production deployment | `README.md`, `docs/SOP-006-SUBPATH-REVERSE-PROXY-DEPLOYMENT.md`, `git tag v1.0.0`; `npm audit` 0 vulns; `npm run check` & `npm run build` exit `0`; `nginx:1.27-alpine` serving `/labels/` with `application/javascript` on `.mjs` + `Permissions-Policy` & zero root-app regression |
 
 ---
 
@@ -106,12 +107,21 @@
 - **Branch**: `feat/apple-cupertino-ui` → merged into `main`
 - **Design & Engineering**:
   - Updated `src/tokens.css` with Apple HIG Light/Pro Dark palettes (`#F5F5F7` / `#0B0B0D`), frosted vibrancy glass (`--nb-glass-blur: 24px`), concentric squircle radii, spring easing, and `#FA4676` primary brand accent (`theme_color` synced in `public/manifest.webmanifest`, `index.html`, `public/pwa-icon.svg`, and `public/favicon.svg`).
-  - Added pure-DOM SF-Symbol-inspired SVG factory `src/ui/icons.ts` using `document.createElementNS` (zero `innerHTML`, space-separated SVG path coordinates).
+- Added pure-DOM SF-Symbol-inspired SVG factory `src/ui/icons.ts` using `document.createElementNS` (zero `innerHTML`, space-separated SVG path coordinates).
   - Refactored `src/main.ts` and `src/style.css` into a sticky frosted topbar with Light/Auto/Dark segmented control (`localStorage`-persisted via `document.documentElement.dataset.theme`), sticky inspector sidebar with Apple segmented controls & `#FA4676` sliders/stepper, tactile PDF dropzone hero, sticky batch toolbar, and 50×50 mm silicone release-liner sticker preview cards with toggleable 1 mm bleed guides.
+
+### Task #9 — v1.0.0 Release Documentation & Subpath Reverse-Proxy Production Deployment
+- **Date**: 2026-11-16
+- **Branch & Tag**: `feat/release-v1-docs` → merged into `main`, tagged `v1.0.0`
+- **Public-Repo & Deployment Architecture**:
+  - Created portfolio-grade root `README.md` documenting ARM64 Snapdragon + x64 driverless WebSerial/WebBluetooth architecture, `384×400 px` 203 DPI thermal rasterization, `#FA4676` Apple Cupertino UI, security/token guardrails, local quickstart, and generic `/labels/` subpath reverse-proxy hosting snippets.
+  - Created `docs/SOP-006-SUBPATH-REVERSE-PROXY-DEPLOYMENT.md` following the 4-section SOP format (`Prerequisites`, `Execution Steps`, `Expected Output`, `Rollback`) with sanitized generic placeholders (`app.example.com`, `deploy@proxy.example.com`).
+  - Deployed isolated `nginx:1.27-alpine` static container (`read_only: true`, `tmpfs` scratch paths, explicit `.mjs` → `application/javascript` & `.webmanifest` → `application/manifest+json` MIME types, `Permissions-Policy: serial=(self), bluetooth=(self), usb=(self)...`, `Content-Security-Policy`, and `no-cache` vs `immutable` cache headers) behind Traefik v3 (`/labels` → `/labels/` redirect prior to `stripprefix`, `priority=200`) with zero impact on root host applications.
 
 ---
 
-## 5-Task Environment & Architecture State Summary
+## Final v1.0.0 Environment & Architecture State Summary
 - **Supported Client Hosts**: Any Windows 10/11 PC (**x86_64 Intel/AMD** and **ARM64 Snapdragon**) running Microsoft Edge or Google Chrome (`>= 117`) over `https://` or `http://localhost` — **zero custom USB drivers** (`usbser.sys` built-in for `VID_3513&PID_0002` on dynamic COM ports) and **zero Node.js required** via installable Offline PWA.
-- **Raster Pipeline**: Offline `pdfjs-dist@6.5.438` worker (`enableScripting: false`, `enableXfa: false`) → 4× supersampled white-composited render → `384×400 px` (203 DPI, 48 mm active head + 1 mm side margins) → 1-bit Threshold or Atkinson dithering → `ImageEncoder.encodeCanvas(..., PageColorType.SingleColor, "top")`.
-- **Hardware & Batch Engine**: `@mmote/niimbluelib@0.49.1` dual WebSerial + WebBluetooth controller with `LabelType.WithGaps = 1` default, 1-sticker zero-heat gap alignment feed, `0x8E` optical calibration, multi-page batch queue with per-page selection and safe `Stop After Current Sticker` (`AbortController` → `printEnd()`).
+- **Raster Pipeline**: Offline `pdfjs-dist@6.5.438` worker (`enableScripting: false`, `enableXfa: false`, `MAX_PDF_BYTES = 25 MB`, `MAX_PDF_PAGES = 100`, `%PDF-` header check) → 4× supersampled white-composited render → `384×400 px` (203 DPI, 48 mm active head + 1 mm side margins) → 1-bit Threshold or Atkinson dithering → `ImageEncoder.encodeCanvas(..., PageColorType.SingleColor, "top")`.
+- **Hardware & Batch Engine**: `@mmote/niimbluelib@0.49.1` dual WebSerial + WebBluetooth controller with `LabelType.WithGaps = 1` default, 1-sticker zero-heat gap alignment feed, `0x8E` optical calibration, `20 ms` Windows BLE GATT pacing (`30 s` page timeout), multi-page batch queue with per-page selection, and safe `Stop After Current Sticker` (`AbortController` → `printEnd()`).
+- **UI, Guardrails & Hosting**: Apple Cupertino Print-Center **Label Studio** (`#FA4676`, `--nb-*` tokens in `src/tokens.css`, pure-DOM SVG icons, strict CSP), Biome + `scripts/verify-guardrails.mjs` + `.githooks/pre-commit` + GitHub Actions CI, and hardened `nginx:1.27-alpine` / Traefik v3 subpath static PWA hosting (`base: "./"`, `sw.js`).
