@@ -1,4 +1,4 @@
-// Minimal W3C WebSerial & WebBluetooth ambient types for Chromium browsers
+// Minimal W3C WebSerial, WebBluetooth & PWA Install ambient types for Chromium browsers
 // Avoids global @types pollution while keeping strict TypeScript (zero `any`).
 
 interface SerialPortInfo {
@@ -40,4 +40,13 @@ interface Serial extends EventTarget {
 interface Navigator {
   readonly serial?: Serial;
   readonly bluetooth?: unknown;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
+interface WindowEventMap {
+  beforeinstallprompt: BeforeInstallPromptEvent;
 }

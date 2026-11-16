@@ -6,6 +6,7 @@
 | **Task #2** | `COMPLETED` | Vite + TypeScript repo scaffold, security-pinned deps, `@mmote/niimbluelib` TypeScript signature audit, SOP-001 & Git/GitHub setup | Pinned `@mmote/niimbluelib@0.49.1` & `pdfjs-dist@6.5.438` (`>= 6.2.108`, CVE-2026-16633 patched; `enableScripting: false` policy); `npx tsc --noEmit` exits `0`; `docs/SOP-001-ENVIRONMENT-AND-SETUP.md` created; Git branch `feat/init-architecture` committed |
 | **Task #3** | `COMPLETED` | 50×50 mm PDF-to-384×400 px thermal rasterization engine, 1-bit binarization (Threshold & Atkinson), `ImageEncoder` validation & live preview UI | `src/pdf/binarizer.ts`, `src/pdf/rasterizer.ts`, `src/main.ts`, `tests/binarizer.test.ts`; `npx tsc --noEmit` exits `0`; `npm run build` bundles `pdf.worker.min.mjs`; 3/3 unit tests pass; `docs/SOP-002-PDF-RASTERIZATION-50X50.md` created on `feat/pdf-raster-engine` |
 | **Task #4** | `COMPLETED` | Niimbot B1 WebSerial (`COM9`) / WebBluetooth transport, RFID & heartbeat telemetry, `WithGaps=1` calibration & single-sticker print state machine | `src/printer/b1Client.ts`, `src/printer/web-hardware.d.ts`, `tests/b1Client.test.ts`, live Hardware Panel & Protocol Log UI; `npx tsc --noEmit` exits `0`; `npm run build` exits `0`; 7/7 unit tests pass; `docs/SOP-003-B1-USB-BLE-GAP-PRINTING.md` created on `feat/b1-hardware-transport` |
+| **Task #5** | `COMPLETED` | Multi-PC x64/ARM64 dynamic USB + Windows BLE pacing hardening, multi-page PDF batch printing (`AbortController`), zero-dependency Offline PWA (`sw.js` + `manifest.webmanifest`), GitHub Pages HTTPS CI/CD & merge to `main` | `vite.config.ts` (`base: "./"`), `public/manifest.webmanifest`, `public/pwa-icon.svg`, `.github/workflows/deploy-pages.yml`, `docs/SOP-004-MULTI-PC-AND-BLUETOOTH-DEPLOYMENT.md`; `npx tsc --noEmit` exits `0`; `npm run build` emits `dist/sw.js` (0 npm vulns); 10/10 unit tests pass; merged to `main` |
 
 ---
 
@@ -70,3 +71,19 @@
   - `src/printer/web-hardware.d.ts`: Strict W3C WebSerial & WebBluetooth interfaces (zero `any`).
   - `src/printer/b1Client.ts`: `B1PrinterController` with `VID_3513:PID_0002` (`COM9`) USB filtering, `beforeunload` port cleanup, strict `384×400` pre-print dimension guard, `try/catch/finally` guaranteed `printEnd()`, and structured protocol log emitter.
   - `tests/b1Client.test.ts`: 4 deterministic state-machine unit tests (dimension guard, `WithGaps=1` lifecycle order, mid-print timeout `printEnd()` recovery without deadlock, and `0x8E` calibration sequence).
+
+### Task #5 — Multi-PC Portability (x64/ARM64), Windows BLE Hardening, Batch Queue & Offline PWA
+- **Date**: 2026-11-16
+- **Branch**: `feat/multi-pc-ble-batch-pwa` → merged into `main`
+- **Verified BLE & Multi-Page Internals** (`node_modules/@mmote/niimbluelib/dist/cjs`):
+  - **BLE Discovery & GATT Transport** (`bluetooth_impl.js`): Filters by service UUID `e7810a71-73ae-499d-8c15-faa9aef0c3f2` and model first-letter prefixes (`{ namePrefix: "B" }`, etc.), selecting a characteristic with `notify && writeWithoutResponse`.
+  - **BLE Packet Pacing**: Bitmap row commands (`PrintBitmapRow=133`, `PrintBitmapRowIndexed=131`, `PrintEmptyRow=132`) map to `null` (`oneWay = true`) in `commands.js` and write via `writeValueWithoutResponse` after `Utils.sleep(this.packetIntervalMs)` (default `10 ms` in `abstract_client.js`). On Windows 11 BLE, `B1PrinterController` sets `setPacketInterval(20)` (`20 ms`), `pageTimeoutMs = 30000`, and `statusPollIntervalMs = 250` (vs. `10 ms` / `15000 ms` / `100 ms` on USB Serial) to prevent 58-byte `PrintBitmapRow` GATT buffer drops before `PageEnd` (`cmd 227`).
+  - **Multi-Page `B1PrintTask` Loop**: `B1PrintTask.printInit()` sends `printStart7b(totalPages)` once; `B1PrintTask` inherits `AbstractPrintTask.waitForPageFinished()` (`Promise.resolve()`) and holds label stock at the printhead between pages until `totalPages` completes (or `printEnd()` terminates early on `AbortController` cancellation).
+  - **Dependency Hygiene**: Audited `vite-plugin-pwa@2.0.0`, which introduced 322 transitive packages and 6 moderate/low advisories (`glob@11.1.0`, `minimatch`, `deepmerge`). Removed it in favor of a clean zero-dependency `offlinePwaPlugin()` in `vite.config.ts` (`0` npm vulnerabilities, `29` total packages).
+
+---
+
+## 5-Task Environment & Architecture State Summary
+- **Supported Client Hosts**: Any Windows 10/11 PC (**x86_64 Intel/AMD** and **ARM64 Snapdragon**) running Microsoft Edge or Google Chrome (`>= 117`) over `https://` or `http://localhost` — **zero custom USB drivers** (`usbser.sys` built-in for `VID_3513&PID_0002` on dynamic COM ports) and **zero Node.js required** via installable Offline PWA.
+- **Raster Pipeline**: Offline `pdfjs-dist@6.5.438` worker (`enableScripting: false`, `enableXfa: false`) → 4× supersampled white-composited render → `384×400 px` (203 DPI, 48 mm active head + 1 mm side margins) → 1-bit Threshold or Atkinson dithering → `ImageEncoder.encodeCanvas(..., PageColorType.SingleColor, "top")`.
+- **Hardware & Batch Engine**: `@mmote/niimbluelib@0.49.1` dual WebSerial + WebBluetooth controller with `LabelType.WithGaps = 1` default, 1-sticker zero-heat gap alignment feed, `0x8E` optical calibration, multi-page batch queue with per-page selection and safe `Stop After Current Sticker` (`AbortController` → `printEnd()`).

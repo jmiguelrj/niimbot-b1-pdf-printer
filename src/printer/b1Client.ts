@@ -40,18 +40,38 @@ export interface ProtocolLogEntry {
 }
 
 export interface PrintLiveProgress {
-  phase: "init" | "transfer" | "printing" | "cleanup" | "done";
+  phase: "init" | "transfer" | "printing" | "cleanup" | "cancelled" | "done";
   packetTransferPct: number;
   pagePrintPct: number;
   pageFeedPct: number;
   currentPage: number;
   totalPages: number;
+  currentBatchPage?: number;
+  totalBatchPages?: number;
+}
+
+export interface BatchPrintProgress {
+  phase: "init" | "transfer" | "printing" | "cleanup" | "cancelled" | "done";
+  currentStickerIndex: number;
+  totalStickers: number;
+  currentPageIndex: number;
+  totalDistinctPages: number;
+  packetTransferPct: number;
+  pagePrintPct: number;
+  pageFeedPct: number;
+}
+
+export interface BatchPrintResult {
+  completedPages: number;
+  totalStickersPrinted: number;
+  cancelled: boolean;
 }
 
 export interface PrinterTelemetrySnapshot {
   state: PrinterControllerState;
   transport: TransportKind | null;
   deviceName: string | null;
+  packetIntervalMs: number | null;
   modelName: string | null;
   modelId: number | null;
   printheadPixels: number | null;
@@ -84,6 +104,15 @@ export interface SinglePrintJobOptions {
   statusTimeoutMs?: number;
 }
 
+export interface BatchPrintJobOptions {
+  density?: number;
+  labelType?: LabelType;
+  copiesPerPage?: number;
+  statusPollIntervalMs?: number;
+  pageTimeoutMs?: number;
+  statusTimeoutMs?: number;
+}
+
 export interface UsbConnectOptions {
   filterKnownVendors?: boolean;
 }
@@ -108,6 +137,8 @@ export interface TransportClientLike {
   connect(): Promise<ConnectionInfo>;
   disconnect(): Promise<void>;
   isConnected(): boolean;
+  setPacketInterval(milliseconds: number): void;
+  getPacketInterval(): number;
   startHeartbeat(): void;
   stopHeartbeat(): void;
   fetchPrinterInfo(): Promise<PrinterInfo>;
@@ -136,7 +167,7 @@ export interface B1ControllerDependencies {
   requestUsbPort?: (filters: SerialPortFilter[]) => Promise<SerialPort>;
 }
 
-/** Niimbot B1 native USB VID/PID (0x3513:0x0002 on COM9) + CH34x fallback (0x1a86) */
+/** Niimbot B1 native USB VID/PID (0x3513:0x0002 via built-in Windows usbser.sys) + CH34x fallback (0x1a86) */
 export const NIIMBOT_USB_FILTERS: SerialPortFilter[] = [
   { usbVendorId: 0x3513, usbProductId: 0x0002 },
   { usbVendorId: 0x3513 },
@@ -148,6 +179,16 @@ export const MIN_PRINT_DENSITY = 1;
 export const MAX_PRINT_DENSITY = 5;
 export const DEFAULT_LABEL_TYPE: LabelType = LabelType.WithGaps;
 export const MAX_SINGLE_PRINT_COPIES = 20;
+
+/** Transport-specific packet pacing & timeout defaults verified against @mmote/niimbluelib */
+export const USB_PACKET_INTERVAL_MS = 10;
+export const BLE_PACKET_INTERVAL_MS = 20; // Prevents Win11 GATT writeWithoutResponse 58-byte row buffer drops
+export const USB_PAGE_TIMEOUT_MS = 15_000;
+export const BLE_PAGE_TIMEOUT_MS = 30_000; // 400 rows * 20ms = 8s max raw transfer + generous GATT margin
+export const USB_STATUS_POLL_INTERVAL_MS = 100;
+export const BLE_STATUS_POLL_INTERVAL_MS = 250;
+export const USB_STATUS_TIMEOUT_MS = 8_000;
+export const BLE_STATUS_TIMEOUT_MS = 12_000;
 
 export function detectBrowserTransportCapabilities(): BrowserTransportCapabilities {
   const hasNavigator = typeof navigator !== "undefined";
@@ -169,6 +210,7 @@ function isUserCancelledError(err: unknown): boolean {
   return (
     err.name === "NotFoundError" ||
     msg.includes("no port selected") ||
+    msg.includes("no device selected") ||
     msg.includes("user cancelled") ||
     msg.includes("user canceled")
   );
@@ -187,8 +229,19 @@ export function formatHardwareError(err: unknown, transport: TransportKind | nul
         lower.includes("access is denied"))
     ) {
       return (
-        "Failed to open USB serial port (COM9 may be locked by Niimbot Desktop, another browser tab, " +
-        "or a serial monitor). Close other apps using COM9, unplug/replug USB-C if needed, and retry."
+        "Failed to open USB serial port (the Windows COM port may be locked by Niimbot Desktop, another browser tab, " +
+        "or a serial monitor). Close other apps using the printer, unplug/replug USB-C if needed, and retry."
+      );
+    }
+    if (
+      transport === "ble" &&
+      (err.name === "NetworkError" ||
+        lower.includes("gatt") ||
+        lower.includes("bluetooth adapter not available"))
+    ) {
+      return (
+        `Bluetooth BLE connection failed (${err.message}). Ensure Windows Bluetooth is ON, unplug any PC USB-C data cable ` +
+        "from the B1, disconnect the mobile Niimbot app, and wake the printer."
       );
     }
     return err.message;
@@ -197,7 +250,6 @@ export function formatHardwareError(err: unknown, transport: TransportKind | nul
 }
 
 function buildBlankGapAlignmentImage(): EncodedImage {
-  // 400 white rows chunked at 200-row boundary to match ImageEncoder.encodeCanvas output
   return {
     cols: LABEL_WIDTH_PX,
     rows: LABEL_HEIGHT_PX,
@@ -268,8 +320,11 @@ export class B1PrinterController {
   private transport: TransportKind | null = null;
   private client: TransportClientLike | null = null;
   private operationInFlight = false;
+  private intentionalDisconnect = false;
   private deviceName: string | null = null;
   private lastError: string | null = null;
+  private activeBatchPageIndex = 1;
+  private activeBatchTotalPages = 1;
   private readonly logs: ProtocolLogEntry[] = [];
 
   private readonly stateListeners = new Set<(snapshot: PrinterTelemetrySnapshot) => void>();
@@ -291,6 +346,10 @@ export class B1PrinterController {
 
   getState(): PrinterControllerState {
     return this.state;
+  }
+
+  getTransport(): TransportKind | null {
+    return this.transport;
   }
 
   getLogs(): readonly ProtocolLogEntry[] {
@@ -343,6 +402,7 @@ export class B1PrinterController {
       state: this.state,
       transport: this.transport,
       deviceName: this.deviceName,
+      packetIntervalMs: this.client?.isConnected() ? this.client.getPacketInterval() : null,
       modelName,
       modelId: info?.modelId ?? null,
       printheadPixels: detectedPixels,
@@ -386,26 +446,30 @@ export class B1PrinterController {
         this.log(
           "info",
           filterKnownVendors
-            ? "Requesting WebSerial port (filtered for Niimbot VID_3513 / PID_0002 COM9)..."
-            : "Requesting WebSerial port (all serial ports)...",
+            ? "Requesting WebSerial port (filtered for Niimbot VID_3513 / PID_0002 — dynamic Windows COM port)..."
+            : "Requesting WebSerial port (showing all Windows COM ports)...",
         );
         authorizedPort = await navigator.serial.requestPort(
           filterKnownVendors ? { filters: NIIMBOT_USB_FILTERS } : undefined,
         );
       } else if (!this.deps.createSerialClient) {
         throw new Error(
-          "WebSerial API is unavailable in this browser. Open in Microsoft Edge or Google Chrome over localhost/HTTPS.",
+          "WebSerial API is unavailable in this browser. Open in Microsoft Edge or Google Chrome over HTTPS or localhost.",
         );
       }
 
-      this.attachClientEvents(serialClient);
+      serialClient.setPacketInterval(USB_PACKET_INTERVAL_MS);
+      this.attachClientEvents(serialClient, "usb");
       const connInfo = await serialClient.connect(
         authorizedPort ? { authorizedPort } : undefined,
       );
       this.client = serialClient;
-      this.deviceName = connInfo.deviceName ?? "Niimbot B1 (USB Serial)";
+      this.deviceName = connInfo.deviceName ?? "USB Serial (VID:3513 PID:0002)";
       await serialClient.fetchHeartbeatData();
-      this.log("info", `Connected over USB Serial: ${this.deviceName}`);
+      this.log(
+        "info",
+        `USB Serial Connected: ${this.deviceName} [packetInterval=${serialClient.getPacketInterval()}ms]`,
+      );
       this.operationInFlight = false;
       this.setState("ready");
       return true;
@@ -417,7 +481,7 @@ export class B1PrinterController {
 
       if (isUserCancelledError(err)) {
         this.transport = null;
-        this.log("info", "USB port selection cancelled by operator.");
+        this.log("info", "USB-C port picker closed without selection.");
         this.setState("disconnected");
         return false;
       }
@@ -450,17 +514,24 @@ export class B1PrinterController {
         (typeof navigator === "undefined" || !navigator.bluetooth)
       ) {
         throw new Error(
-          "WebBluetooth API is unavailable in this browser. Open in Microsoft Edge or Google Chrome over localhost/HTTPS.",
+          "WebBluetooth API is unavailable in this browser. Open in Microsoft Edge or Google Chrome over HTTPS or localhost.",
         );
       }
 
-      this.log("info", "Requesting Niimbot B1 over WebBluetooth BLE...");
-      this.attachClientEvents(bleClient);
+      bleClient.setPacketInterval(BLE_PACKET_INTERVAL_MS);
+      this.log(
+        "info",
+        `Scanning for Niimbot B1 over WebBluetooth BLE (service e7810a71-..., packetInterval=${BLE_PACKET_INTERVAL_MS}ms)...`,
+      );
+      this.attachClientEvents(bleClient, "ble");
       const connInfo = await bleClient.connect();
       this.client = bleClient;
-      this.deviceName = connInfo.deviceName ?? "Niimbot B1 (BLE)";
+      this.deviceName = connInfo.deviceName ?? "B1";
       await bleClient.fetchHeartbeatData();
-      this.log("info", `Connected over Bluetooth BLE: ${this.deviceName}`);
+      this.log(
+        "info",
+        `Bluetooth BLE Connected: ${this.deviceName} [packetInterval=${bleClient.getPacketInterval()}ms]`,
+      );
       this.operationInFlight = false;
       this.setState("ready");
       return true;
@@ -472,7 +543,7 @@ export class B1PrinterController {
 
       if (isUserCancelledError(err)) {
         this.transport = null;
-        this.log("info", "Bluetooth device picker cancelled by operator.");
+        this.log("info", "Bluetooth BLE picker closed without selection.");
         this.setState("disconnected");
         return false;
       }
@@ -487,17 +558,22 @@ export class B1PrinterController {
 
   async disconnect(): Promise<void> {
     const activeClient = this.client;
+    this.intentionalDisconnect = true;
     this.client = null;
     this.deviceName = null;
     this.transport = null;
     this.operationInFlight = false;
     this.lastError = null;
 
-    if (activeClient) {
-      activeClient.stopHeartbeat();
-      activeClient.removeAllListeners();
-      await activeClient.disconnect().catch(() => undefined);
-      this.log("info", "Disconnected printer transport and released port.");
+    try {
+      if (activeClient) {
+        activeClient.stopHeartbeat();
+        activeClient.removeAllListeners();
+        await activeClient.disconnect().catch(() => undefined);
+        this.log("info", "Disconnected printer transport cleanly.");
+      }
+    } finally {
+      this.intentionalDisconnect = false;
     }
 
     this.setState("disconnected");
@@ -573,44 +649,97 @@ export class B1PrinterController {
     encodedImage: EncodedImage,
     options: SinglePrintJobOptions = {},
   ): Promise<void> {
-    // 1. Strict 384x400 dimension guard BEFORE touching protocol or hardware
-    if (encodedImage.cols !== LABEL_WIDTH_PX || encodedImage.rows !== LABEL_HEIGHT_PX) {
-      throw new Error(
-        `Invalid B1 label bitmap dimensions: expected ${LABEL_WIDTH_PX}x${LABEL_HEIGHT_PX} px, got ${encodedImage.cols}x${encodedImage.rows} px.`,
-      );
+    await this.printBatchLabels([encodedImage], {
+      density: options.density,
+      labelType: options.labelType,
+      copiesPerPage: options.copies,
+      statusPollIntervalMs: options.statusPollIntervalMs,
+      pageTimeoutMs: options.pageTimeoutMs,
+      statusTimeoutMs: options.statusTimeoutMs,
+    });
+  }
+
+  async printBatchLabels(
+    pages: readonly EncodedImage[],
+    options: BatchPrintJobOptions = {},
+    onBatchProgress?: (progress: BatchPrintProgress) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<BatchPrintResult> {
+    if (pages.length === 0) {
+      throw new Error("Batch print requires at least 1 label page.");
     }
+
+    // 1. Validate ALL pages upfront before touching protocol or hardware
+    for (let i = 0; i < pages.length; i++) {
+      const img = pages[i];
+      if (img.cols !== LABEL_WIDTH_PX || img.rows !== LABEL_HEIGHT_PX) {
+        throw new Error(
+          `Invalid B1 label bitmap dimensions on page ${i + 1}: expected ${LABEL_WIDTH_PX}x${LABEL_HEIGHT_PX} px, got ${img.cols}x${img.rows} px.`,
+        );
+      }
+    }
+
+    if (abortSignal?.aborted) {
+      return { completedPages: 0, totalStickersPrinted: 0, cancelled: true };
+    }
+
+    const client = this.requireIdleConnectedClient();
+    const isBle = this.transport === "ble";
 
     const density = Math.max(
       MIN_PRINT_DENSITY,
       Math.min(MAX_PRINT_DENSITY, Math.round(options.density ?? DEFAULT_PRINT_DENSITY)),
     );
-    const copies = Math.max(
+    const copiesPerPage = Math.max(
       1,
-      Math.min(MAX_SINGLE_PRINT_COPIES, Math.round(options.copies ?? 1)),
+      Math.min(MAX_SINGLE_PRINT_COPIES, Math.round(options.copiesPerPage ?? 1)),
     );
     const labelType = options.labelType ?? DEFAULT_LABEL_TYPE;
-    const statusPollIntervalMs = options.statusPollIntervalMs ?? 100;
-    const pageTimeoutMs = options.pageTimeoutMs ?? 15_000;
-    const statusTimeoutMs = options.statusTimeoutMs ?? 8_000;
+    const statusPollIntervalMs =
+      options.statusPollIntervalMs ??
+      (isBle ? BLE_STATUS_POLL_INTERVAL_MS : USB_STATUS_POLL_INTERVAL_MS);
+    const pageTimeoutMs =
+      options.pageTimeoutMs ?? (isBle ? BLE_PAGE_TIMEOUT_MS : USB_PAGE_TIMEOUT_MS);
+    const statusTimeoutMs =
+      options.statusTimeoutMs ?? (isBle ? BLE_STATUS_TIMEOUT_MS : USB_STATUS_TIMEOUT_MS);
 
-    const client = this.requireIdleConnectedClient();
+    const totalDistinctPages = pages.length;
+    const totalStickers = totalDistinctPages * copiesPerPage;
 
     this.operationInFlight = true;
     this.lastError = null;
+    this.activeBatchPageIndex = 1;
+    this.activeBatchTotalPages = totalDistinctPages;
     this.setState("printing");
     client.stopHeartbeat();
 
-    this.emitProgress({
+    const reportBoth = (p: BatchPrintProgress): void => {
+      onBatchProgress?.(p);
+      this.emitProgress({
+        phase: p.phase,
+        packetTransferPct: p.packetTransferPct,
+        pagePrintPct: p.pagePrintPct,
+        pageFeedPct: p.pageFeedPct,
+        currentPage: p.currentStickerIndex,
+        totalPages: p.totalStickers,
+        currentBatchPage: p.currentPageIndex,
+        totalBatchPages: p.totalDistinctPages,
+      });
+    };
+
+    reportBoth({
       phase: "init",
+      currentStickerIndex: 0,
+      totalStickers,
+      currentPageIndex: 1,
+      totalDistinctPages,
       packetTransferPct: 0,
       pagePrintPct: 0,
       pageFeedPct: 0,
-      currentPage: 0,
-      totalPages: copies,
     });
 
     const task = client.protocol.newPrintTask("B1", {
-      totalPages: copies,
+      totalPages: totalStickers,
       density,
       labelType,
       pageColor: PageColorType.SingleColor,
@@ -619,70 +748,129 @@ export class B1PrinterController {
       pageTimeoutMs,
     });
 
+    let completedPages = 0;
+    let completedStickers = 0;
+    let cancelled = false;
+
     try {
       this.log(
         "info",
-        `B1PrintTask.printInit() [density=${density}, labelType=${labelType}, totalPages=${copies}]`,
+        `B1PrintTask.printInit() [${this.transport?.toUpperCase() ?? "LINK"} · density=${density}, labelType=${labelType}, pages=${totalDistinctPages}, copiesPerPage=${copiesPerPage}, totalStickers=${totalStickers}, pageTimeout=${pageTimeoutMs}ms]`,
       );
       await task.printInit();
 
-      this.emitProgress({
-        phase: "transfer",
-        packetTransferPct: 0,
-        pagePrintPct: 0,
-        pageFeedPct: 0,
-        currentPage: 1,
-        totalPages: copies,
-      });
+      for (let idx = 0; idx < pages.length; idx++) {
+        if (abortSignal?.aborted) {
+          cancelled = true;
+          this.log(
+            "warn",
+            `Batch stop requested — halting cleanly after ${completedPages}/${totalDistinctPages} page(s).`,
+          );
+          break;
+        }
 
-      this.log(
-        "info",
-        `B1PrintTask.printPage() [384x400 px, ${encodedImage.rowsData.length} row segments, copies=${copies}]`,
-      );
-      await task.printPage(encodedImage, copies);
-      await task.waitForPageFinished();
+        const pageImg = pages[idx];
+        this.activeBatchPageIndex = idx + 1;
+        const startingStickerNumber = completedStickers + 1;
 
-      this.emitProgress({
-        phase: "printing",
-        packetTransferPct: 100,
-        pagePrintPct: 0,
-        pageFeedPct: 0,
-        currentPage: 1,
-        totalPages: copies,
-      });
+        reportBoth({
+          phase: "transfer",
+          currentStickerIndex: startingStickerNumber,
+          totalStickers,
+          currentPageIndex: idx + 1,
+          totalDistinctPages,
+          packetTransferPct: 0,
+          pagePrintPct: 0,
+          pageFeedPct: 0,
+        });
 
-      this.log(
-        "info",
-        `B1PrintTask.waitForFinished() [statusPoll=${statusPollIntervalMs}ms]`,
-      );
-      await task.waitForFinished();
+        this.log(
+          "info",
+          `B1PrintTask.printPage(${idx + 1}/${totalDistinctPages}) [384x400 px, ${pageImg.rowsData.length} row segments, copies=${copiesPerPage}]`,
+        );
+        await task.printPage(pageImg, copiesPerPage);
+        await task.waitForPageFinished();
 
-      this.emitProgress({
-        phase: "done",
-        packetTransferPct: 100,
-        pagePrintPct: 100,
-        pageFeedPct: 100,
-        currentPage: copies,
-        totalPages: copies,
-      });
-      this.log(
-        "info",
-        `Sticker print completed cleanly (${copies} ${copies === 1 ? "copy" : "copies"}).`,
-      );
+        completedPages++;
+        completedStickers += copiesPerPage;
+
+        if (abortSignal?.aborted && idx < pages.length - 1) {
+          cancelled = true;
+          this.log(
+            "warn",
+            `Stop After Current Sticker triggered — stopping after page ${completedPages}/${totalDistinctPages}.`,
+          );
+          break;
+        }
+      }
+
+      if (!cancelled) {
+        reportBoth({
+          phase: "printing",
+          currentStickerIndex: completedStickers,
+          totalStickers,
+          currentPageIndex: totalDistinctPages,
+          totalDistinctPages,
+          packetTransferPct: 100,
+          pagePrintPct: 0,
+          pageFeedPct: 0,
+        });
+
+        this.log(
+          "info",
+          `B1PrintTask.waitForFinished() [totalStickers=${totalStickers}, statusPoll=${statusPollIntervalMs}ms]`,
+        );
+        await task.waitForFinished();
+
+        reportBoth({
+          phase: "done",
+          currentStickerIndex: totalStickers,
+          totalStickers,
+          currentPageIndex: totalDistinctPages,
+          totalDistinctPages,
+          packetTransferPct: 100,
+          pagePrintPct: 100,
+          pageFeedPct: 100,
+        });
+        this.log(
+          "info",
+          `Print job completed cleanly (${totalStickers} ${totalStickers === 1 ? "sticker" : "stickers"}).`,
+        );
+      } else {
+        reportBoth({
+          phase: "cancelled",
+          currentStickerIndex: completedStickers,
+          totalStickers,
+          currentPageIndex: completedPages,
+          totalDistinctPages,
+          packetTransferPct: 100,
+          pagePrintPct: 100,
+          pageFeedPct: 100,
+        });
+      }
+
+      return {
+        completedPages,
+        totalStickersPrinted: completedStickers,
+        cancelled,
+      };
     } catch (err) {
       const formatted = formatHardwareError(err, this.transport);
       this.lastError = formatted;
       this.log("error", `Print failed: ${formatted}`);
       throw new Error(formatted);
     } finally {
-      this.emitProgress({
+      reportBoth({
         phase: "cleanup",
+        currentStickerIndex: completedStickers,
+        totalStickers,
+        currentPageIndex: Math.max(1, completedPages),
+        totalDistinctPages,
         packetTransferPct: 100,
         pagePrintPct: 100,
         pageFeedPct: 100,
-        currentPage: copies,
-        totalPages: copies,
       });
+
       const endOk = await task.printEnd().catch((cleanupErr: unknown) => {
         const msg = cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr);
         this.log("warn", `printEnd() cleanup warning: ${msg}`);
@@ -695,7 +883,7 @@ export class B1PrinterController {
         client.startHeartbeat();
         this.setState("ready");
       } else {
-        this.setState("error");
+        this.setState("disconnected");
       }
     }
   }
@@ -705,15 +893,25 @@ export class B1PrinterController {
       throw new Error(`Printer is busy (${this.state}). Wait for the active job to finish.`);
     }
     if (!this.client || !this.client.isConnected()) {
-      throw new Error("Niimbot B1 is not connected. Connect via USB (COM9) or Bluetooth first.");
+      throw new Error("Niimbot B1 is not connected. Connect via USB-C or Bluetooth BLE first.");
     }
     return this.client;
   }
 
-  private attachClientEvents(client: TransportClientLike): void {
+  private attachClientEvents(client: TransportClientLike, transportKind: TransportKind): void {
     client.on("disconnect", () => {
-      this.log("warn", "Hardware link disconnected.");
+      if (this.intentionalDisconnect) {
+        return;
+      }
+      const dropReason =
+        transportKind === "ble"
+          ? "Bluetooth BLE link lost (printer powered off or moved out of range)."
+          : "USB-C cable unplugged or Windows serial port closed.";
+      this.lastError = dropReason;
+      this.log("warn", dropReason);
       this.client = null;
+      this.deviceName = null;
+      this.transport = null;
       this.operationInFlight = false;
       this.setState("disconnected");
     });
@@ -738,8 +936,10 @@ export class B1PrinterController {
         packetTransferPct: evt.progress,
         pagePrintPct: 0,
         pageFeedPct: 0,
-        currentPage: 1,
-        totalPages: 1,
+        currentPage: this.activeBatchPageIndex,
+        totalPages: this.activeBatchTotalPages,
+        currentBatchPage: this.activeBatchPageIndex,
+        totalBatchPages: this.activeBatchTotalPages,
       });
     });
 
@@ -751,6 +951,8 @@ export class B1PrinterController {
         pageFeedPct: evt.pageFeedProgress,
         currentPage: evt.page,
         totalPages: evt.pagesTotal,
+        currentBatchPage: this.activeBatchPageIndex,
+        totalBatchPages: this.activeBatchTotalPages,
       });
     });
   }
