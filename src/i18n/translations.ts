@@ -142,6 +142,9 @@ export interface UiStrings {
   readonly dropzoneAria: string;
   readonly dropzoneTitle: string;
   readonly dropzoneHint: string;
+  readonly loadSampleBtn: string;
+  readonly loadSampleTitle: string;
+  readonly samplePdfFileName: string;
   readonly noPdfLoaded: string;
   readonly pdfReadyStatus: string;
   readonly pdfRasterizing: string;
@@ -384,6 +387,9 @@ export const TRANSLATIONS: Record<Locale, UiStrings> = {
     dropzoneAria: "Select or drop PDF file",
     dropzoneTitle: "Drop 50×50 mm PDF Label Sheet",
     dropzoneHint: "Click to browse · Up to 25 MB / 100 pages · Local offline rendering",
+    loadSampleBtn: "Load Sample 50×50 mm Sticker",
+    loadSampleTitle: "Generate and preview a built-in 50×50 mm calibration PDF",
+    samplePdfFileName: "calibration-50x50mm.pdf",
     noPdfLoaded: "No PDF loaded",
     pdfReadyStatus: "Ready for PDF input.",
     pdfRasterizing: "Rasterizing {name} at 384×400 px…",
@@ -652,6 +658,9 @@ export const TRANSLATIONS: Record<Locale, UiStrings> = {
     dropzoneAria: "Selecionar ou soltar arquivo PDF",
     dropzoneTitle: "Solte o PDF de Etiquetas 50×50 mm",
     dropzoneHint: "Clique para escolher · Até 25 MB / 100 páginas · Processamento local offline",
+    loadSampleBtn: "Carregar Etiqueta Exemplo 50×50 mm",
+    loadSampleTitle: "Gerar e visualizar uma etiqueta PDF de calibração 50×50 mm integrada",
+    samplePdfFileName: "calibracao-50x50mm.pdf",
     noPdfLoaded: "Nenhum PDF carregado",
     pdfReadyStatus: "Pronto para receber PDF.",
     pdfRasterizing: "Convertendo {name} para 384×400 px…",

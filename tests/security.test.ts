@@ -87,7 +87,7 @@ test("subpath PWA manifest, Service Worker scope, and localStorage namespace are
 
   const viteConfig = fs.readFileSync("vite.config.ts", "utf8");
   assert.match(viteConfig, /niimbot-label-studio-/);
-  assert.match(viteConfig, /v1\.1\.1-/);
+  assert.match(viteConfig, /v1\.2\.0-/);
   assert.match(viteConfig, /"\.\/niimbot-b1\.svg"/);
   assert.match(viteConfig, /k\.startsWith\(CACHE_PREFIX\) && k !== CACHE_NAME/);
   assert.match(viteConfig, /!event\.request\.url\.startsWith\(self\.registration\.scope\)/);

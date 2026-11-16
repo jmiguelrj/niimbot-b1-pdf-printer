@@ -693,8 +693,10 @@ summary:focus-visible {
 
 .dropzone {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   padding: 20px;
   border: 1.5px dashed var(--nb-border-strong);
   border-radius: var(--nb-radius-lg);
@@ -704,6 +706,19 @@ summary:focus-visible {
     border-color 0.2s ease,
     background 0.2s ease,
     box-shadow 0.2s var(--nb-ease-spring);
+}
+
+.dropzone-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.dropzone-sample-btn {
+  border-radius: var(--nb-radius-pill);
+  flex-shrink: 0;
 }
 
 .dropzone:hover,

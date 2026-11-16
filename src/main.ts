@@ -16,6 +16,7 @@ import {
   type RenderedLabelPage,
   rasterizePdfDocument,
 } from "./pdf/rasterizer.ts";
+import { createSample50x50PdfBytes } from "./pdf/samplePdf.ts";
 import {
   B1PrinterController,
   DEFAULT_LABEL_TYPE,
@@ -820,6 +821,18 @@ const fileInput = el("input", {
 });
 const dropzoneTitleEl = el("div", { className: "dropzone-title", text: t().dropzoneTitle });
 const dropzoneHintEl = el("div", { className: "dropzone-hint", text: t().dropzoneHint });
+const loadSampleBtnLabel = el("span", { text: t().loadSampleBtn });
+const loadSampleBtn = el(
+  "button",
+  {
+    id: "load-sample-btn",
+    type: "button",
+    className: "btn btn-tinted btn-sm dropzone-sample-btn",
+    title: t().loadSampleTitle,
+  },
+  createIcon("sparkles", 14),
+  loadSampleBtnLabel,
+);
 const dropzone = el(
   "div",
   {
@@ -828,8 +841,13 @@ const dropzone = el(
     role: "button",
     attrs: { tabindex: "0", "aria-label": t().dropzoneAria },
   },
-  el("div", { className: "dropzone-icon-badge" }, createIcon("uploadPdf", 24)),
-  el("div", { className: "dropzone-copy" }, dropzoneTitleEl, dropzoneHintEl),
+  el(
+    "div",
+    { className: "dropzone-main" },
+    el("div", { className: "dropzone-icon-badge" }, createIcon("uploadPdf", 24)),
+    el("div", { className: "dropzone-copy" }, dropzoneTitleEl, dropzoneHintEl),
+  ),
+  loadSampleBtn,
   fileInput,
 );
 
@@ -1502,6 +1520,8 @@ function applyAllTranslations(): void {
   dropzone.setAttribute("aria-label", s.dropzoneAria);
   dropzoneTitleEl.textContent = s.dropzoneTitle;
   dropzoneHintEl.textContent = s.dropzoneHint;
+  loadSampleBtn.title = s.loadSampleTitle;
+  loadSampleBtnLabel.textContent = s.loadSampleBtn;
   fileMetaEl.textContent = state.fileMeta
     ? `${state.fileMeta.name} (${state.fileMeta.sizeKb} KB)`
     : s.noPdfLoaded;
@@ -1605,6 +1625,19 @@ async function handleSelectedFile(file: File): Promise<void> {
     sizeKb: (file.size / 1024).toFixed(1),
   };
   state.pdfBytes = new Uint8Array(buffer);
+  fileMetaEl.textContent = `${state.fileMeta.name} (${state.fileMeta.sizeKb} KB)`;
+  await runRasterPipeline(true);
+}
+
+async function handleLoadSamplePdf(): Promise<void> {
+  const bytes = createSample50x50PdfBytes();
+  const sampleName = t().samplePdfFileName;
+  state.fileName = sampleName;
+  state.fileMeta = {
+    name: sampleName,
+    sizeKb: (bytes.byteLength / 1024).toFixed(1),
+  };
+  state.pdfBytes = bytes;
   fileMetaEl.textContent = `${state.fileMeta.name} (${state.fileMeta.sizeKb} KB)`;
   await runRasterPipeline(true);
 }
@@ -1785,6 +1818,16 @@ clearLogBtn.addEventListener("click", () => {
   protocolLogEl.replaceChildren();
   state.logCount = 0;
   logCountPill.textContent = formatText(t().eventsMany, { n: 0 });
+});
+
+loadSampleBtn.addEventListener("click", (event) => {
+  event.stopPropagation();
+  void handleLoadSamplePdf();
+});
+loadSampleBtn.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.stopPropagation();
+  }
 });
 
 dropzone.addEventListener("click", () => fileInput.click());

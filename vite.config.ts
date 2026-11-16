@@ -26,7 +26,7 @@ function offlinePwaPlugin(): Plugin {
         hash = (hash * 31 + versionSeed.charCodeAt(i)) >>> 0;
       }
       const cachePrefix = "niimbot-label-studio-";
-      const cacheName = `${cachePrefix}v1.1.1-${hash.toString(16)}`;
+      const cacheName = `${cachePrefix}v1.2.0-${hash.toString(16)}`;
 
       const swSource = `const CACHE_PREFIX = ${JSON.stringify(cachePrefix)};
 const CACHE_NAME = ${JSON.stringify(cacheName)};
