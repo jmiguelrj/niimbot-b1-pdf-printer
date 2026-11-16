@@ -15,7 +15,11 @@ export type IconName =
   | "refresh"
   | "downloadApp"
   | "disconnect"
-  | "info";
+  | "info"
+  | "book"
+  | "close"
+  | "layers"
+  | "sliders";
 
 interface SvgNodeDef {
   tag: "path" | "rect" | "circle" | "polyline" | "line" | "polygon";
@@ -125,6 +129,33 @@ const ICON_DEFINITIONS: Record<IconName, readonly SvgNodeDef[]> = {
     { tag: "circle", attrs: { cx: "12", cy: "12", r: "9" } },
     { tag: "line", attrs: { x1: "12", y1: "11", x2: "12", y2: "16" } },
     { tag: "circle", attrs: { cx: "12", cy: "8", r: "0.7" } },
+  ],
+  book: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M 4 5 A 2 2 0 0 1 6 3 H 11 A 2 2 0 0 1 13 5 V 20 A 2 2 0 0 0 11 18 H 6 A 2 2 0 0 0 4 20 Z",
+      },
+    },
+    {
+      tag: "path",
+      attrs: { d: "M 20 5 A 2 2 0 0 0 18 3 H 13 V 20 A 2 2 0 0 1 15 18 H 18 A 2 2 0 0 1 20 20 Z" },
+    },
+  ],
+  close: [
+    { tag: "line", attrs: { x1: "18", y1: "6", x2: "6", y2: "18" } },
+    { tag: "line", attrs: { x1: "6", y1: "6", x2: "18", y2: "18" } },
+  ],
+  layers: [
+    { tag: "polygon", attrs: { points: "12 3 3 8 12 13 21 8 12 3" } },
+    { tag: "polyline", attrs: { points: "3 12 12 17 21 12" } },
+    { tag: "polyline", attrs: { points: "3 16 12 21 21 16" } },
+  ],
+  sliders: [
+    { tag: "line", attrs: { x1: "4", y1: "7", x2: "20", y2: "7" } },
+    { tag: "circle", attrs: { cx: "9", cy: "7", r: "2" } },
+    { tag: "line", attrs: { x1: "4", y1: "17", x2: "20", y2: "17" } },
+    { tag: "circle", attrs: { cx: "15", cy: "17", r: "2" } },
   ],
 };
 

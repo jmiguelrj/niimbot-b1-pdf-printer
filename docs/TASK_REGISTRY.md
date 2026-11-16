@@ -12,6 +12,7 @@
 | **Task #8** | `COMPLETED` | Apple Cupertino Print-Center UI/UX redesign (`#FA4676` accent, Light/Auto/Dark modes & pure-DOM SVG icons) | `src/tokens.css`, `src/style.css`, `src/ui/icons.ts`, `src/main.ts`, updated PWA squircle icons/manifest; `npm audit` 0 vulns; `npm run check` (15/15 tests) & `npm run build` exit `0` |
 | **Task #9** | `COMPLETED` | Public showcase `README.md`, `SOP-006` subpath reverse-proxy guide, `v1.0.0` release tag & zero-downtime `nginx:1.27-alpine` / Traefik `/labels/` production deployment | `README.md`, `docs/SOP-006-SUBPATH-REVERSE-PROXY-DEPLOYMENT.md`, `git tag v1.0.0`; `npm audit` 0 vulns; `npm run check` & `npm run build` exit `0`; `nginx:1.27-alpine` serving `/labels/` with `application/javascript` on `.mjs` + `Permissions-Policy` & zero root-app regression |
 | **Task #10** | `COMPLETED` | Same-origin subpath PWA, Service Worker, CacheStorage, `localStorage` & Nginx cookie/log isolation hardening (`v1.0.1`) | `public/manifest.webmanifest` (`id`/`start_url`/`scope: "./"`), `vite.config.ts` (`niimbot-label-studio-` prefixed CacheStorage + `self.registration.scope` fetch/prune bounds), `src/main.ts` (`niimbot-label-studio:theme`, scoped SW registration), `tests/security.test.ts`; `npm audit` 0 vulns; `npm run check` (16/16 tests) & `npm run build` exit `0` |
+| **Task #11** | `COMPLETED` | Live `EN` / `PT-BR` bilingual UI, interactive 5-tab Apple User Manual & Niimbot B1 studio hardware showcase (`v1.1.0`) | `src/i18n/translations.ts`, `src/ui/manualModal.ts`, `public/niimbot-b1.webp`, `src/ui/icons.ts`, `src/tokens.css`, `src/style.css`, `src/main.ts`, `tests/i18n.test.ts`, `tests/security.test.ts`; `npm audit` 0 vulns; `npm run check` & `npm run build` exit `0`; zero-downtime `nginx -s reload` serving `/labels/niimbot-b1.webp` (`image/webp`) |
 
 ---
 
@@ -128,10 +129,18 @@
   - Updated `src/main.ts` to use `niimbot-label-studio:theme` for `localStorage` persistence and register `./sw.js` with `{ scope: "./" }`.
   - Updated production static Nginx config with header-free `static_minimal` access logging (ignoring cookies/query strings, zero `Set-Cookie` emission).
 
+### Task #11 — Bilingual `EN`/`PT-BR` UI, Interactive Manual & B1 Hardware Showcase (`v1.1.0`)
+- **Date**: 2026-11-16
+- **Branch & Tag**: `feat/pt-br-manual-printer-visual` → merged into `main`, tagged `v1.1.0`
+- **Features & Verification**:
+  - Added strictly typed zero-dependency `en` / `pt-BR` dictionary (`src/i18n/translations.ts`, `niimbot-label-studio:locale`, `navigator.language` auto-detection) with in-place UI translation preserving active USB/BLE sessions and rendered PDF previews.
+  - Added Apple macOS Help / Tips `<dialog>` sheet (`src/ui/manualModal.ts`) accessible from topbar `Manual` / `Ajuda` button and printer showcase pod link, covering Quick Start, Hardware & LEDs (`./niimbot-b1.webp`), USB-C & Bluetooth BLE pairing on Windows, 1-Bit Quality & Gap Calibration, and PWA Install.
+  - Integrated `./niimbot-b1.webp` inside `.device-showcase-pod` (consistent `#FFFFFF` studio pedestal in Light & Dark modes with live ready/busy status ring) and added precaching (`niimbot-label-studio-v1.1.0-*`) + unit test parity enforcement (`tests/i18n.test.ts` + `tests/security.test.ts`).
+
 ---
 
-## Final v1.0.0 Environment & Architecture State Summary
+## Final v1.1.0 Environment & Architecture State Summary
 - **Supported Client Hosts**: Any Windows 10/11 PC (**x86_64 Intel/AMD** and **ARM64 Snapdragon**) running Microsoft Edge or Google Chrome (`>= 117`) over `https://` or `http://localhost` — **zero custom USB drivers** (`usbser.sys` built-in for `VID_3513&PID_0002` on dynamic COM ports) and **zero Node.js required** via installable Offline PWA.
 - **Raster Pipeline**: Offline `pdfjs-dist@6.5.438` worker (`enableScripting: false`, `enableXfa: false`, `MAX_PDF_BYTES = 25 MB`, `MAX_PDF_PAGES = 100`, `%PDF-` header check) → 4× supersampled white-composited render → `384×400 px` (203 DPI, 48 mm active head + 1 mm side margins) → 1-bit Threshold or Atkinson dithering → `ImageEncoder.encodeCanvas(..., PageColorType.SingleColor, "top")`.
 - **Hardware & Batch Engine**: `@mmote/niimbluelib@0.49.1` dual WebSerial + WebBluetooth controller with `LabelType.WithGaps = 1` default, 1-sticker zero-heat gap alignment feed, `0x8E` optical calibration, `20 ms` Windows BLE GATT pacing (`30 s` page timeout), multi-page batch queue with per-page selection, and safe `Stop After Current Sticker` (`AbortController` → `printEnd()`).
-- **UI, Guardrails & Hosting**: Apple Cupertino Print-Center **Label Studio** (`#FA4676`, `--nb-*` tokens in `src/tokens.css`, pure-DOM SVG icons, strict CSP), Biome + `scripts/verify-guardrails.mjs` + `.githooks/pre-commit` + GitHub Actions CI, and hardened `nginx:1.27-alpine` / Traefik v3 subpath static PWA hosting (`base: "./"`, `sw.js`).
+- **UI, Bilingual i18n, Guardrails & Hosting**: Apple Cupertino Print-Center **Label Studio** (`#FA4676`, live `EN`/`PT-BR` i18n in `src/i18n/translations.ts`, 5-tab interactive Manual in `src/ui/manualModal.ts`, `./niimbot-b1.webp` device showcase pod, `niimbot-label-studio:` namespaced `localStorage`, `--nb-*` tokens in `src/tokens.css`, pure-DOM SVG icons, strict CSP), Biome + `scripts/verify-guardrails.mjs` + `.githooks/pre-commit` + GitHub Actions CI, and hardened `nginx:1.27-alpine` / Traefik v3 subpath static PWA hosting (`base: "./"`, scoped `sw.js`).

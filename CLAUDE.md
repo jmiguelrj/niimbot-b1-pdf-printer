@@ -15,6 +15,7 @@ Local-first, zero-driver 50×50 mm PDF thermal label printer web application (Vi
 - **Strict TypeScript**: ZERO `any` (`noExplicitAny: "error"` in `biome.json`).
 - **Strict CSP**: `index.html` enforces `style-src 'self'` and `script-src 'self'`. Do NOT write inline `style=` attributes or `.style.*` mutations; toggle CSS classes or `<progress>` elements instead.
 - **PDF Safety Bounds**: Enforce `MAX_PDF_BYTES = 25 MB`, `%PDF-` magic header check (`validatePdfBytes`), `MAX_PDF_PAGES = 100` (`validatePdfPageCount`), `enableScripting: false`, and `enableXfa: false`.
+- **Origin Storage & i18n Locks**: All `localStorage` keys in `src/` MUST start with `"niimbot-label-studio:"` (`niimbot-label-studio:theme`, `niimbot-label-studio:locale`), and `src/i18n/translations.ts` MUST preserve 100% key/placeholder parity between `en` and `pt-BR`.
 
 ## Design Token Architecture & UI Icons
 - All colors, glass blur, shadows, typography, and radii live in `src/tokens.css` under canonical `--nb-*` custom properties.

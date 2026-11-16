@@ -1050,6 +1050,373 @@ summary:focus-visible {
   color: var(--nb-log-error);
 }
 
+/* Printer Inspector Hardware Showcase Pod */
+.device-showcase-pod {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-border);
+  background: var(--nb-surface-alt);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s var(--nb-ease-spring);
+}
+
+.device-showcase-pod.is-ready {
+  border-color: var(--nb-ok-border);
+  box-shadow: var(--nb-device-ring-ready);
+}
+
+.device-showcase-pod.is-busy {
+  border-color: var(--nb-accent-border);
+  box-shadow: var(--nb-device-ring-busy);
+}
+
+.device-photo-well {
+  width: 62px;
+  height: 72px;
+  padding: 6px;
+  border-radius: var(--nb-radius-sm);
+  background: var(--nb-device-well-bg);
+  border: 1px solid var(--nb-device-well-border);
+  box-shadow: var(--nb-device-well-shadow);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.device-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.device-pod-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.device-pod-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.device-pod-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--nb-text);
+}
+
+.device-pod-status {
+  font-family: var(--nb-font-mono);
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: var(--nb-text-muted);
+}
+
+.device-showcase-pod.is-ready .device-pod-status {
+  color: var(--nb-ok-text);
+}
+
+.device-showcase-pod.is-busy .device-pod-status {
+  color: var(--nb-accent);
+}
+
+.device-pod-spec {
+  font-size: 0.74rem;
+  color: var(--nb-text-muted);
+}
+
+.device-pod-link {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--nb-accent);
+  font-family: var(--nb-font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.device-pod-link:hover {
+  color: var(--nb-accent-hover);
+  text-decoration: underline;
+}
+
+/* Interactive Apple Help & User Manual Sheet */
+.manual-dialog {
+  width: min(860px, calc(100vw - 28px));
+  max-height: calc(100vh - 36px);
+  padding: 0;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius-xl);
+  background: var(--nb-surface);
+  color: var(--nb-text);
+  box-shadow: var(--nb-modal-shadow);
+  overflow: hidden;
+}
+
+.manual-dialog::backdrop {
+  background: var(--nb-backdrop-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.manual-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 38px);
+}
+
+.manual-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--nb-glass-bg);
+  backdrop-filter: blur(var(--nb-glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--nb-glass-blur)) saturate(180%);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.manual-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-header-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--nb-radius-sm);
+  background: var(--nb-accent-soft);
+  border: 1px solid var(--nb-accent-border);
+  color: var(--nb-accent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.manual-title {
+  margin: 0;
+  font-size: 1.04rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.manual-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.77rem;
+  color: var(--nb-text-muted);
+}
+
+.manual-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--nb-radius-pill);
+  border: 1px solid var(--nb-border);
+  background: var(--nb-surface-alt);
+  color: var(--nb-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.manual-close-btn:hover {
+  background: var(--nb-segmented-track);
+}
+
+.manual-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 20px;
+  background: var(--nb-surface-alt);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.manual-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--nb-radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--nb-text-muted);
+  font-family: var(--nb-font-sans);
+  font-size: 0.79rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.manual-tab-btn:hover {
+  color: var(--nb-text);
+  background: var(--nb-segmented-track);
+}
+
+.manual-tab-btn.is-active {
+  background: var(--nb-surface);
+  color: var(--nb-accent);
+  border-color: var(--nb-accent-border);
+  box-shadow: var(--nb-segmented-shadow);
+}
+
+.manual-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.manual-intro {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--nb-text-muted);
+  line-height: 1.55;
+}
+
+.manual-step-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.manual-step-card {
+  padding: 14px 16px;
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-border);
+  background: var(--nb-surface-alt);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manual-step-card h3 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--nb-text);
+}
+
+.manual-step-card p {
+  margin: 0;
+  font-size: 0.81rem;
+  color: var(--nb-text-muted);
+  line-height: 1.5;
+}
+
+.manual-hero-card {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  border-radius: var(--nb-radius-lg);
+  border: 1px solid var(--nb-border);
+  background: var(--nb-surface-alt);
+}
+
+@media (max-width: 620px) {
+  .manual-hero-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.manual-hero-well {
+  padding: 14px;
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-device-well-bg);
+  border: 1px solid var(--nb-device-well-border);
+  box-shadow: var(--nb-device-well-shadow);
+  display: grid;
+  place-items: center;
+}
+
+.manual-hero-img {
+  width: 100%;
+  max-width: 132px;
+  height: auto;
+  display: block;
+}
+
+.manual-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manual-hero-copy h3 {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.manual-hero-copy p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--nb-text-muted);
+  line-height: 1.5;
+}
+
+.manual-callout {
+  padding: 13px 15px;
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-accent-border);
+  background: var(--nb-accent-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.manual-callout.is-warn {
+  border-color: var(--nb-warn-border);
+  background: var(--nb-warn-bg);
+  color: var(--nb-warn-text);
+}
+
+.manual-callout h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.manual-callout p {
+  margin: 0;
+  font-size: 0.81rem;
+  line-height: 1.5;
+  color: var(--nb-text);
+}
+
+.manual-callout.is-warn p {
+  color: var(--nb-warn-text);
+}
+
 .hidden-input {
   display: none;
 }

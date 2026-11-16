@@ -57,23 +57,33 @@ test("subpath PWA manifest, Service Worker scope, and localStorage namespace are
   assert.equal(manifest.scope, "./");
 
   const mainTs = fs.readFileSync("src/main.ts", "utf8");
-  const storageKeyMatch = mainTs.match(/const THEME_STORAGE_KEY = "([^"]+)"/);
-  assert.ok(storageKeyMatch, "THEME_STORAGE_KEY constant must exist in src/main.ts");
-  assert.ok(
-    storageKeyMatch[1].startsWith("niimbot-label-studio:"),
-    `THEME_STORAGE_KEY must use niimbot-label-studio: prefix, got ${storageKeyMatch[1]}`,
-  );
-  for (const call of mainTs.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)) {
-    const arg = call[1].trim();
-    assert.ok(
-      arg === "THEME_STORAGE_KEY" || /^"niimbot-label-studio:[^"]+"$/.test(arg),
-      `Unscoped localStorage key usage detected: ${arg}`,
-    );
+  const i18nTs = fs.readFileSync("src/i18n/translations.ts", "utf8");
+  const combinedStorageSources = [mainTs, i18nTs];
+
+  for (const source of combinedStorageSources) {
+    for (const keyMatch of source.matchAll(/const\s+\w+_STORAGE_KEY\s*=\s*"([^"]+)"/g)) {
+      assert.ok(
+        keyMatch[1].startsWith("niimbot-label-studio:"),
+        `Storage key constant must use niimbot-label-studio: prefix, got ${keyMatch[1]}`,
+      );
+    }
+    for (const call of source.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)) {
+      const arg = call[1].trim();
+      assert.ok(
+        /^(?:THEME|LOCALE)_STORAGE_KEY$/.test(arg) || /^"niimbot-label-studio:[^"]+"$/.test(arg),
+        `Unscoped localStorage key usage detected: ${arg}`,
+      );
+    }
   }
   assert.match(mainTs, /serviceWorker\.register\("\.\/sw\.js",\s*\{\s*scope:\s*"\.\/"\s*\}\)/);
 
+  const b1WebpStat = fs.statSync("public/niimbot-b1.webp");
+  assert.ok(b1WebpStat.size > 0, "public/niimbot-b1.webp must be non-empty");
+
   const viteConfig = fs.readFileSync("vite.config.ts", "utf8");
   assert.match(viteConfig, /niimbot-label-studio-/);
+  assert.match(viteConfig, /v1\.1\.0-/);
+  assert.match(viteConfig, /"\.\/niimbot-b1\.webp"/);
   assert.match(viteConfig, /k\.startsWith\(CACHE_PREFIX\) && k !== CACHE_NAME/);
   assert.match(viteConfig, /!event\.request\.url\.startsWith\(self\.registration\.scope\)/);
 });
