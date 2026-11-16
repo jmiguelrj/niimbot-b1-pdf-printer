@@ -22,7 +22,7 @@ import { createIcon } from "./ui/icons.ts";
 
 type ThemeMode = "light" | "auto" | "dark";
 
-const THEME_STORAGE_KEY = "nb-theme-mode";
+const THEME_STORAGE_KEY = "niimbot-label-studio:theme";
 
 interface AppState {
   fileName: string | null;
@@ -1360,7 +1360,7 @@ installPwaBtn.addEventListener("click", async () => {
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("./sw.js");
+    void navigator.serviceWorker.register("./sw.js", { scope: "./" });
   });
 }
 

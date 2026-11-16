@@ -2,6 +2,7 @@
   "name": "Label Studio — Niimbot B1 (50×50 mm)",
   "short_name": "Label Studio",
   "description": "Zero-driver USB-C & Bluetooth BLE 50×50 mm PDF thermal label printer for Windows (x64 & ARM64).",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

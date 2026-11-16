@@ -48,3 +48,32 @@ test("Apple Cupertino #FA4676 brand accent token and manifest theme_color are lo
   assert.match(tokensCss, /--nb-accent:\s*#fa4676\b/i);
   assert.match(manifest, /"theme_color":\s*"#fa4676"/i);
 });
+
+test("subpath PWA manifest, Service Worker scope, and localStorage namespace are strictly isolated", () => {
+  const manifestRaw = fs.readFileSync("public/manifest.webmanifest", "utf8");
+  const manifest = JSON.parse(manifestRaw) as { id?: string; start_url?: string; scope?: string };
+  assert.equal(manifest.id, "./");
+  assert.equal(manifest.start_url, "./");
+  assert.equal(manifest.scope, "./");
+
+  const mainTs = fs.readFileSync("src/main.ts", "utf8");
+  const storageKeyMatch = mainTs.match(/const THEME_STORAGE_KEY = "([^"]+)"/);
+  assert.ok(storageKeyMatch, "THEME_STORAGE_KEY constant must exist in src/main.ts");
+  assert.ok(
+    storageKeyMatch[1].startsWith("niimbot-label-studio:"),
+    `THEME_STORAGE_KEY must use niimbot-label-studio: prefix, got ${storageKeyMatch[1]}`,
+  );
+  for (const call of mainTs.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)) {
+    const arg = call[1].trim();
+    assert.ok(
+      arg === "THEME_STORAGE_KEY" || /^"niimbot-label-studio:[^"]+"$/.test(arg),
+      `Unscoped localStorage key usage detected: ${arg}`,
+    );
+  }
+  assert.match(mainTs, /serviceWorker\.register\("\.\/sw\.js",\s*\{\s*scope:\s*"\.\/"\s*\}\)/);
+
+  const viteConfig = fs.readFileSync("vite.config.ts", "utf8");
+  assert.match(viteConfig, /niimbot-label-studio-/);
+  assert.match(viteConfig, /k\.startsWith\(CACHE_PREFIX\) && k !== CACHE_NAME/);
+  assert.match(viteConfig, /!event\.request\.url\.startsWith\(self\.registration\.scope\)/);
+});

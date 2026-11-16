@@ -24,9 +24,11 @@ function offlinePwaPlugin(): Plugin {
       for (let i = 0; i < versionSeed.length; i++) {
         hash = (hash * 31 + versionSeed.charCodeAt(i)) >>> 0;
       }
-      const cacheName = `niimbot-b1-pwa-${hash.toString(16)}`;
+      const cachePrefix = "niimbot-label-studio-";
+      const cacheName = `${cachePrefix}v1.0.1-${hash.toString(16)}`;
 
-      const swSource = `const CACHE_NAME = ${JSON.stringify(cacheName)};
+      const swSource = `const CACHE_PREFIX = ${JSON.stringify(cachePrefix)};
+const CACHE_NAME = ${JSON.stringify(cacheName)};
 const PRECACHE_URLS = ${JSON.stringify(precacheUrls, null, 2)};
 
 self.addEventListener("install", (event) => {
@@ -38,18 +40,28 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+          .map((k) => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (!event.request.url.startsWith(self.registration.scope)) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).then((response) => {
-        if (response && response.status === 200 && response.type === "basic") {
+        if (
+          response &&
+          response.status === 200 &&
+          response.type === "basic" &&
+          response.url.startsWith(self.registration.scope)
+        ) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }

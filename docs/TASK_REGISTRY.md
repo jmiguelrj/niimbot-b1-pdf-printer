@@ -11,6 +11,7 @@
 | **Task #7** | `COMPLETED` | Security hardening, MIT `LICENSE`, `--nb-*` design tokens (`src/tokens.css`), `@biomejs/biome`, `scripts/verify-guardrails.mjs`, `CLAUDE.md`, `.antigravityrules`, pre-commit hook & CI gate | `npm audit` 0 vulns; `npm run check` (Biome + `tsc` + `verify:guardrails` + 13/13 tests) exits `0`; `npm run build` exits `0`; `docs/SOP-005-SECURITY-AND-AGENTIC-GUARDRAILS.md` created & merged to `main` |
 | **Task #8** | `COMPLETED` | Apple Cupertino Print-Center UI/UX redesign (`#FA4676` accent, Light/Auto/Dark modes & pure-DOM SVG icons) | `src/tokens.css`, `src/style.css`, `src/ui/icons.ts`, `src/main.ts`, updated PWA squircle icons/manifest; `npm audit` 0 vulns; `npm run check` (15/15 tests) & `npm run build` exit `0` |
 | **Task #9** | `COMPLETED` | Public showcase `README.md`, `SOP-006` subpath reverse-proxy guide, `v1.0.0` release tag & zero-downtime `nginx:1.27-alpine` / Traefik `/labels/` production deployment | `README.md`, `docs/SOP-006-SUBPATH-REVERSE-PROXY-DEPLOYMENT.md`, `git tag v1.0.0`; `npm audit` 0 vulns; `npm run check` & `npm run build` exit `0`; `nginx:1.27-alpine` serving `/labels/` with `application/javascript` on `.mjs` + `Permissions-Policy` & zero root-app regression |
+| **Task #10** | `COMPLETED` | Same-origin subpath PWA, Service Worker, CacheStorage, `localStorage` & Nginx cookie/log isolation hardening (`v1.0.1`) | `public/manifest.webmanifest` (`id`/`start_url`/`scope: "./"`), `vite.config.ts` (`niimbot-label-studio-` prefixed CacheStorage + `self.registration.scope` fetch/prune bounds), `src/main.ts` (`niimbot-label-studio:theme`, scoped SW registration), `tests/security.test.ts`; `npm audit` 0 vulns; `npm run check` (16/16 tests) & `npm run build` exit `0` |
 
 ---
 
@@ -117,6 +118,15 @@
   - Created portfolio-grade root `README.md` documenting ARM64 Snapdragon + x64 driverless WebSerial/WebBluetooth architecture, `384×400 px` 203 DPI thermal rasterization, `#FA4676` Apple Cupertino UI, security/token guardrails, local quickstart, and generic `/labels/` subpath reverse-proxy hosting snippets.
   - Created `docs/SOP-006-SUBPATH-REVERSE-PROXY-DEPLOYMENT.md` following the 4-section SOP format (`Prerequisites`, `Execution Steps`, `Expected Output`, `Rollback`) with sanitized generic placeholders (`app.example.com`, `deploy@proxy.example.com`).
   - Deployed isolated `nginx:1.27-alpine` static container (`read_only: true`, `tmpfs` scratch paths, explicit `.mjs` → `application/javascript` & `.webmanifest` → `application/manifest+json` MIME types, `Permissions-Policy: serial=(self), bluetooth=(self), usb=(self)...`, `Content-Security-Policy`, and `no-cache` vs `immutable` cache headers) behind Traefik v3 (`/labels` → `/labels/` redirect prior to `stripprefix`, `priority=200`) with zero impact on root host applications.
+
+### Task #10 — Same-Origin Subpath PWA & Storage Isolation (`v1.0.1`)
+- **Date**: 2026-11-16
+- **Branch & Tag**: `fix/subpath-pwa-isolation` → merged into `main`, tagged `v1.0.1`
+- **Isolation Controls**:
+  - Updated `public/manifest.webmanifest` with explicit `"id": "./"`, `"start_url": "./"`, and `"scope": "./"` so browsers install the subpath app independently from any root PWA on the same origin.
+  - Hardened `offlinePwaPlugin()` in `vite.config.ts` with `CACHE_PREFIX = "niimbot-label-studio-"` cache pruning (`k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME`) so activation never evicts sibling app caches on the shared origin, plus strict `self.registration.scope` filtering inside `fetch`.
+  - Updated `src/main.ts` to use `niimbot-label-studio:theme` for `localStorage` persistence and register `./sw.js` with `{ scope: "./" }`.
+  - Updated production static Nginx config with header-free `static_minimal` access logging (ignoring cookies/query strings, zero `Set-Cookie` emission).
 
 ---
 
