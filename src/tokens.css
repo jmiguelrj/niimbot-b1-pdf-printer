@@ -81,9 +81,10 @@
   --nb-slider-track: rgba(120, 120, 128, 0.2);
 
   /* Hardware Pedestal & Modal Vibrancy */
-  --nb-device-well-bg: #ffffff;
-  --nb-device-well-border: rgba(0, 0, 0, 0.08);
-  --nb-device-well-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --nb-device-well-bg: rgba(255, 255, 255, 0.72);
+  --nb-device-well-border: rgba(0, 0, 0, 0.07);
+  --nb-device-well-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --nb-device-img-shadow: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.14));
   --nb-device-ring-ready: 0 0 0 2px #34c759, 0 6px 18px rgba(52, 199, 89, 0.22);
   --nb-device-ring-busy: 0 0 0 2px #fa4676, 0 6px 18px rgba(250, 70, 118, 0.28);
   --nb-backdrop-bg: rgba(15, 15, 20, 0.42);
@@ -123,9 +124,10 @@
     --nb-shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35), 0 12px 28px -8px rgba(0, 0, 0, 0.45);
     --nb-shadow-sticker: 0 4px 14px rgba(0, 0, 0, 0.45), 0 12px 26px -6px rgba(0, 0, 0, 0.55);
     --nb-slider-track: rgba(255, 255, 255, 0.16);
-    --nb-device-well-bg: #ffffff;
-    --nb-device-well-border: rgba(255, 255, 255, 0.16);
-    --nb-device-well-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --nb-device-well-bg: rgba(255, 255, 255, 0.06);
+    --nb-device-well-border: rgba(255, 255, 255, 0.12);
+    --nb-device-well-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+    --nb-device-img-shadow: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.55));
     --nb-device-ring-ready: 0 0 0 2px #30d158, 0 6px 20px rgba(48, 209, 88, 0.3);
     --nb-device-ring-busy: 0 0 0 2px #fa4676, 0 6px 20px rgba(250, 70, 118, 0.34);
     --nb-backdrop-bg: rgba(0, 0, 0, 0.65);
@@ -165,9 +167,10 @@
   --nb-shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35), 0 12px 28px -8px rgba(0, 0, 0, 0.45);
   --nb-shadow-sticker: 0 4px 14px rgba(0, 0, 0, 0.45), 0 12px 26px -6px rgba(0, 0, 0, 0.55);
   --nb-slider-track: rgba(255, 255, 255, 0.16);
-  --nb-device-well-bg: #ffffff;
-  --nb-device-well-border: rgba(255, 255, 255, 0.16);
-  --nb-device-well-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --nb-device-well-bg: rgba(255, 255, 255, 0.06);
+  --nb-device-well-border: rgba(255, 255, 255, 0.12);
+  --nb-device-well-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+  --nb-device-img-shadow: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.55));
   --nb-device-ring-ready: 0 0 0 2px #30d158, 0 6px 20px rgba(48, 209, 88, 0.3);
   --nb-device-ring-busy: 0 0 0 2px #fa4676, 0 6px 20px rgba(250, 70, 118, 0.34);
   --nb-backdrop-bg: rgba(0, 0, 0, 0.65);

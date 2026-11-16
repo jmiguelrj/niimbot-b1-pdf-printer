@@ -92,6 +92,12 @@
                add_header Cache-Control "no-cache" always;
            }
 
+           location = /niimbot-b1.svg {
+               include /etc/nginx/security_headers.conf;
+               add_header Cache-Control "public, max-age=86400" always;
+               try_files $uri =404;
+           }
+
            location ^~ /assets/ {
                include /etc/nginx/security_headers.conf;
                add_header Cache-Control "public, max-age=31536000, immutable" always;
@@ -132,7 +138,11 @@
          - "traefik.http.routers.niimbot-labels-http.entryPoints=http"
          - "traefik.http.routers.niimbot-labels-http.rule=Host(`app.example.com`) && PathPrefix(`/labels`)"
          - "traefik.http.routers.niimbot-labels-http.priority=200"
-         - "traefik.http.routers.niimbot-labels-http.middlewares=niimbot-https-redirect"
+         - "traefik.http.routers.niimbot-labels-http.middlewares=niimbot-http-slash-https,niimbot-https-redirect"
+         - "traefik.http.routers.niimbot-labels-http.service=niimbot-labels-svc"
+         - "traefik.http.middlewares.niimbot-http-slash-https.redirectregex.regex=^http://([^/]+/labels)$$"
+         - "traefik.http.middlewares.niimbot-http-slash-https.redirectregex.replacement=https://$${1}/"
+         - "traefik.http.middlewares.niimbot-http-slash-https.redirectregex.permanent=true"
          - "traefik.http.middlewares.niimbot-https-redirect.redirectscheme.scheme=https"
          - "traefik.http.middlewares.niimbot-https-redirect.redirectscheme.permanent=true"
          - "traefik.http.routers.niimbot-labels-https.entryPoints=https"

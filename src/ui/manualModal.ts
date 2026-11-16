@@ -203,7 +203,7 @@ export function createManualModal(
       const well = document.createElement("div");
       well.className = "manual-hero-well";
       const img = document.createElement("img");
-      img.src = "./niimbot-b1.webp";
+      img.src = "./niimbot-b1.svg";
       img.alt = t.manualHwImgAlt;
       img.className = "manual-hero-img";
       img.loading = "lazy";

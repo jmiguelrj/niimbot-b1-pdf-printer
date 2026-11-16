@@ -77,13 +77,18 @@ test("subpath PWA manifest, Service Worker scope, and localStorage namespace are
   }
   assert.match(mainTs, /serviceWorker\.register\("\.\/sw\.js",\s*\{\s*scope:\s*"\.\/"\s*\}\)/);
 
-  const b1WebpStat = fs.statSync("public/niimbot-b1.webp");
-  assert.ok(b1WebpStat.size > 0, "public/niimbot-b1.webp must be non-empty");
+  const b1Svg = fs.readFileSync("public/niimbot-b1.svg", "utf8");
+  assert.ok(b1Svg.length > 0, "public/niimbot-b1.svg must be non-empty");
+  assert.match(b1Svg, /^<svg\b/);
+  assert.doesNotMatch(b1Svg, /<script\b/i);
+  assert.doesNotMatch(b1Svg, /\bon[a-z]+\s*=/i);
+  assert.doesNotMatch(b1Svg.replaceAll("http://www.w3.org/2000/svg", ""), /https?:\/\//i);
+  assert.equal(fs.existsSync("public/niimbot-b1.webp"), false, "obsolete .webp must be removed");
 
   const viteConfig = fs.readFileSync("vite.config.ts", "utf8");
   assert.match(viteConfig, /niimbot-label-studio-/);
-  assert.match(viteConfig, /v1\.1\.0-/);
-  assert.match(viteConfig, /"\.\/niimbot-b1\.webp"/);
+  assert.match(viteConfig, /v1\.1\.1-/);
+  assert.match(viteConfig, /"\.\/niimbot-b1\.svg"/);
   assert.match(viteConfig, /k\.startsWith\(CACHE_PREFIX\) && k !== CACHE_NAME/);
   assert.match(viteConfig, /!event\.request\.url\.startsWith\(self\.registration\.scope\)/);
 });

@@ -385,7 +385,7 @@ const refreshTelemetryBtn = el(
 const devicePodImg = el("img", {
   className: "device-photo-img",
   attrs: {
-    src: "./niimbot-b1.webp",
+    src: "./niimbot-b1.svg",
     alt: t().devicePodAlt,
     loading: "eager",
     decoding: "async",
