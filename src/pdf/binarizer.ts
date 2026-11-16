@@ -1,7 +1,8 @@
 export const PHYSICAL_LABEL_MM = 50;
 export const PRINTHEAD_DPI = 203;
 export const DOTS_PER_MM = 8;
-export const LABEL_WIDTH_PX = 384; // 48 mm active printhead width (1 mm unprintable margin per side)
+export const B1_PRINTHEAD_PX = 384; // 48 mm active printhead width (1 mm unprintable margin per side)
+export const LABEL_WIDTH_PX = B1_PRINTHEAD_PX;
 export const LABEL_HEIGHT_PX = 400; // 50 mm label height at 8 dots/mm
 export const FULL_PHYSICAL_WIDTH_PX = 400; // 50 mm width before 8 px/side bleed trim
 export const SIDE_BLEED_PX = (FULL_PHYSICAL_WIDTH_PX - LABEL_WIDTH_PX) / 2; // 8 px (1 mm)

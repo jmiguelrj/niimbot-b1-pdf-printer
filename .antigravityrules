@@ -1,0 +1,8 @@
+# Antigravity Rules — niimbot-b1-pdf-printer
+
+1. Hardware locks: Keep `B1_PRINTHEAD_PX = 384`, `LABEL_HEIGHT_PX = 400`, `LabelType.WithGaps` default, and `20 ms` BLE packet pacing intact.
+2. Zero-driver portability: Never hardcode `COM9` or host-specific paths in `src/`. Keep `vite.config.ts` `base: "./"` for subpath and PWA portability.
+3. Security locks: Never introduce `innerHTML`, `outerHTML`, `eval`, `Function`, `any`, inline `style=` / `.style.*`, or remove PDF.js bounds (`MAX_PDF_BYTES`, `MAX_PDF_PAGES`, `%PDF-` header, `enableScripting: false`).
+4. Public-repo locks: Never write private infrastructure IPs, credentials, tokens, or SSH targets into tracked files (`scripts/verify-guardrails.mjs` blocks commits).
+5. Token purity: Define colors/radii/shadows exclusively as `--nb-*` tokens in `src/tokens.css`. Never put raw hex/rgb/hsl literals in `src/style.css`.
+6. Verification gate: Every code edit must pass `npm run check` and `npm run build` with exit code `0`.

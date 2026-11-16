@@ -1,0 +1,38 @@
+name: CI Verification Gate
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Dependency vulnerability audit
+        run: npm audit --audit-level=low
+
+      - name: Run full guardrail, lint, type & unit test gate
+        run: npm run check
+
+      - name: Build offline PWA bundle
+        run: npm run build

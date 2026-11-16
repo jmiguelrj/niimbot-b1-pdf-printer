@@ -31,11 +31,11 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci
 
-      - name: TypeScript static verification
-        run: npx tsc --noEmit
+      - name: Dependency vulnerability audit
+        run: npm audit --audit-level=low
 
-      - name: Run unit tests (binarizer + B1 transport/batch state machine)
-        run: node --test tests/binarizer.test.ts tests/b1Client.test.ts
+      - name: Run full guardrail, lint, type & unit test gate
+        run: npm run check
 
       - name: Build offline-ready PWA bundle
         run: npm run build

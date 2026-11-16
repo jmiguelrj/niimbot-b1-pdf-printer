@@ -1,22 +1,22 @@
 import {
-  LabelType,
-  NiimbotBluetoothClient,
-  NiimbotSerialClient,
-  PacketGenerator,
-  PageColorType,
-  PrintError,
   type CombinedRfidInfo,
   type ConnectionInfo,
   type EncodedImage,
   type HeartbeatData,
   type HeartbeatEvent,
   type HeartbeatFailedEvent,
+  LabelType,
+  NiimbotBluetoothClient,
   type NiimbotPacket,
+  NiimbotSerialClient,
+  PacketGenerator,
+  PageColorType,
+  PrintError,
+  type PrinterInfo,
+  type PrinterModelMeta,
   type PrintOptions,
   type PrintPacketProgressEvent,
   type PrintProgressEvent,
-  type PrinterInfo,
-  type PrinterModelMeta,
   type RfidInfoFetchedEvent,
 } from "@mmote/niimbluelib";
 import { LABEL_HEIGHT_PX, LABEL_WIDTH_PX } from "../pdf/binarizer.ts";
@@ -433,8 +433,7 @@ export class B1PrinterController {
     this.setState("connecting");
 
     const filterKnownVendors = options.filterKnownVendors ?? true;
-    const serialClient =
-      this.deps.createSerialClient?.() ?? new NiimbotSerialClient();
+    const serialClient = this.deps.createSerialClient?.() ?? new NiimbotSerialClient();
 
     try {
       let authorizedPort: SerialPort | undefined;
@@ -460,9 +459,7 @@ export class B1PrinterController {
 
       serialClient.setPacketInterval(USB_PACKET_INTERVAL_MS);
       this.attachClientEvents(serialClient, "usb");
-      const connInfo = await serialClient.connect(
-        authorizedPort ? { authorizedPort } : undefined,
-      );
+      const connInfo = await serialClient.connect(authorizedPort ? { authorizedPort } : undefined);
       this.client = serialClient;
       this.deviceName = connInfo.deviceName ?? "USB Serial (VID:3513 PID:0002)";
       await serialClient.fetchHeartbeatData();
@@ -505,8 +502,7 @@ export class B1PrinterController {
     this.lastError = null;
     this.setState("connecting");
 
-    const bleClient =
-      this.deps.createBluetoothClient?.() ?? new NiimbotBluetoothClient();
+    const bleClient = this.deps.createBluetoothClient?.() ?? new NiimbotBluetoothClient();
 
     try {
       if (
@@ -892,7 +888,7 @@ export class B1PrinterController {
     if (this.operationInFlight || this.state === "printing" || this.state === "calibrating") {
       throw new Error(`Printer is busy (${this.state}). Wait for the active job to finish.`);
     }
-    if (!this.client || !this.client.isConnected()) {
+    if (!this.client?.isConnected()) {
       throw new Error("Niimbot B1 is not connected. Connect via USB-C or Bluetooth BLE first.");
     }
     return this.client;

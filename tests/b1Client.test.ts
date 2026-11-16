@@ -2,29 +2,29 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AutoShutdownTime,
-  ConnectResult,
-  LabelType,
-  NiimbotPacket,
-  PageColorType,
-  PrinterModel,
   type CombinedRfidInfo,
+  ConnectResult,
   type EncodedImage,
   type HeartbeatData,
-  type PrintOptions,
+  LabelType,
+  type NiimbotPacket,
+  PageColorType,
   type PrinterInfo,
+  PrinterModel,
   type PrinterModelMeta,
+  type PrintOptions,
 } from "@mmote/niimbluelib";
 import {
   B1PrinterController,
   BLE_PACKET_INTERVAL_MS,
   BLE_PAGE_TIMEOUT_MS,
   BLE_STATUS_POLL_INTERVAL_MS,
-  USB_PACKET_INTERVAL_MS,
-  USB_PAGE_TIMEOUT_MS,
-  USB_STATUS_POLL_INTERVAL_MS,
   type PrintTaskLike,
   type SerialTransportClientLike,
   type TransportClientLike,
+  USB_PACKET_INTERVAL_MS,
+  USB_PAGE_TIMEOUT_MS,
+  USB_STATUS_POLL_INTERVAL_MS,
 } from "../src/printer/b1Client.ts";
 
 interface MockHarness {

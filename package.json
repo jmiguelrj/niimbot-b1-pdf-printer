@@ -4,11 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "biome check src tests",
+    "format": "biome format --write src tests",
+    "verify:guardrails": "node scripts/verify-guardrails.mjs",
+    "test": "node --test tests/binarizer.test.ts tests/b1Client.test.ts tests/security.test.ts",
+    "check": "npm run lint && npx tsc --noEmit && npm run verify:guardrails && npm test"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.8",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
   },

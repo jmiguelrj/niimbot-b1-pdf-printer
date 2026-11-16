@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  LABEL_HEIGHT_PX,
-  LABEL_WIDTH_PX,
   binarizeRgbaBuffer,
   computeRasterGeometry,
   isApproximately50x50Mm,
+  LABEL_HEIGHT_PX,
+  LABEL_WIDTH_PX,
   pointsToMillimeters,
 } from "../src/pdf/binarizer.ts";
 

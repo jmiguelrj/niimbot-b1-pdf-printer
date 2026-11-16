@@ -7,6 +7,8 @@
 | **Task #3** | `COMPLETED` | 50×50 mm PDF-to-384×400 px thermal rasterization engine, 1-bit binarization (Threshold & Atkinson), `ImageEncoder` validation & live preview UI | `src/pdf/binarizer.ts`, `src/pdf/rasterizer.ts`, `src/main.ts`, `tests/binarizer.test.ts`; `npx tsc --noEmit` exits `0`; `npm run build` bundles `pdf.worker.min.mjs`; 3/3 unit tests pass; `docs/SOP-002-PDF-RASTERIZATION-50X50.md` created on `feat/pdf-raster-engine` |
 | **Task #4** | `COMPLETED` | Niimbot B1 WebSerial (`COM9`) / WebBluetooth transport, RFID & heartbeat telemetry, `WithGaps=1` calibration & single-sticker print state machine | `src/printer/b1Client.ts`, `src/printer/web-hardware.d.ts`, `tests/b1Client.test.ts`, live Hardware Panel & Protocol Log UI; `npx tsc --noEmit` exits `0`; `npm run build` exits `0`; 7/7 unit tests pass; `docs/SOP-003-B1-USB-BLE-GAP-PRINTING.md` created on `feat/b1-hardware-transport` |
 | **Task #5** | `COMPLETED` | Multi-PC x64/ARM64 dynamic USB + Windows BLE pacing hardening, multi-page PDF batch printing (`AbortController`), zero-dependency Offline PWA (`sw.js` + `manifest.webmanifest`), GitHub Pages HTTPS CI/CD & merge to `main` | `vite.config.ts` (`base: "./"`), `public/manifest.webmanifest`, `public/pwa-icon.svg`, `.github/workflows/deploy-pages.yml`, `docs/SOP-004-MULTI-PC-AND-BLUETOOTH-DEPLOYMENT.md`; `npx tsc --noEmit` exits `0`; `npm run build` emits `dist/sw.js` (0 npm vulns); 10/10 unit tests pass; merged to `main` |
+| **Task #6** | `COMPLETED` | Read-only security, public-repo readiness & proxy routing discovery audit | `npm audit` 0 vulns; identified missing `LICENSE`, `appRoot.innerHTML`, unbounded PDF size/pages, and missing CSP; confirmed production reverse proxy routing requirements with zero local/remote mutations |
+| **Task #7** | `COMPLETED` | Security hardening, MIT `LICENSE`, `--nb-*` design tokens (`src/tokens.css`), `@biomejs/biome`, `scripts/verify-guardrails.mjs`, `CLAUDE.md`, `.antigravityrules`, pre-commit hook & CI gate | `npm audit` 0 vulns; `npm run check` (Biome + `tsc` + `verify:guardrails` + 13/13 tests) exits `0`; `npm run build` exits `0`; `docs/SOP-005-SECURITY-AND-AGENTIC-GUARDRAILS.md` created & merged to `main` |
 
 ---
 
@@ -80,6 +82,23 @@
   - **BLE Packet Pacing**: Bitmap row commands (`PrintBitmapRow=133`, `PrintBitmapRowIndexed=131`, `PrintEmptyRow=132`) map to `null` (`oneWay = true`) in `commands.js` and write via `writeValueWithoutResponse` after `Utils.sleep(this.packetIntervalMs)` (default `10 ms` in `abstract_client.js`). On Windows 11 BLE, `B1PrinterController` sets `setPacketInterval(20)` (`20 ms`), `pageTimeoutMs = 30000`, and `statusPollIntervalMs = 250` (vs. `10 ms` / `15000 ms` / `100 ms` on USB Serial) to prevent 58-byte `PrintBitmapRow` GATT buffer drops before `PageEnd` (`cmd 227`).
   - **Multi-Page `B1PrintTask` Loop**: `B1PrintTask.printInit()` sends `printStart7b(totalPages)` once; `B1PrintTask` inherits `AbstractPrintTask.waitForPageFinished()` (`Promise.resolve()`) and holds label stock at the printhead between pages until `totalPages` completes (or `printEnd()` terminates early on `AbortController` cancellation).
   - **Dependency Hygiene**: Audited `vite-plugin-pwa@2.0.0`, which introduced 322 transitive packages and 6 moderate/low advisories (`glob@11.1.0`, `minimatch`, `deepmerge`). Removed it in favor of a clean zero-dependency `offlinePwaPlugin()` in `vite.config.ts` (`0` npm vulnerabilities, `29` total packages).
+
+### Task #6 — Read-Only Security & Public-Repo Readiness Audit
+- **Date**: 2026-11-16
+- **Findings**:
+  - `npm audit` clean (`0` vulnerabilities); zero secrets or internal IPs in tracked files.
+  - Gaps identified: missing root `LICENSE`, `appRoot.innerHTML` shell construction in `src/main.ts`, missing `MAX_PDF_BYTES` / `MAX_PDF_PAGES` / `%PDF-` header checks, and missing `Content-Security-Policy` meta tag in `index.html`.
+  - Reverse proxy discovery confirmed root `/` is occupied by an existing host application, making subpath/static container mounting or GitHub Pages HTTPS the cleanest zero-collision deployment path.
+
+### Task #7 — Security Hardening & Genki-Style Engineering Guardrails
+- **Date**: 2026-11-16
+- **Branch**: `feat/security-and-guardrails` → merged into `main`
+- **Hardening & Tooling**:
+  - Added root MIT `LICENSE` for public open-source readiness.
+  - Eliminated `innerHTML` and inline `.style.*` mutations in `src/main.ts` using typed `document.createElement` builders, `.is-hidden` class toggles, and native `<progress>` bar.
+  - Added `src/pdf/validation.ts` (`MAX_PDF_BYTES = 25 MB`, `MAX_PDF_PAGES = 100`, `%PDF-` magic-header validation) and strict CSP `<meta>` tag in `index.html`.
+  - Extracted canonical `--nb-*` CSS custom properties into `src/tokens.css` (with dark-mode support via `prefers-color-scheme: dark` and `[data-theme="dark"]`), refactoring `src/style.css` to 100% `var(--nb-*)` token consumption.
+  - Installed `@biomejs/biome@2.6.8` (`noExplicitAny: "error"`, `noDangerouslySetInnerHtml: "error"`), `scripts/verify-guardrails.mjs`, `CLAUDE.md`, `.antigravityrules`, `.githooks/pre-commit`, and `.github/workflows/ci.yml`.
 
 ---
 

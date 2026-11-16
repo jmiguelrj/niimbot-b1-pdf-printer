@@ -1,27 +1,36 @@
-import { ImageEncoder, PageColorType, type EncodedImage } from "@mmote/niimbluelib";
+import { type EncodedImage, ImageEncoder, PageColorType } from "@mmote/niimbluelib";
 import {
   GlobalWorkerOptions,
   getDocument,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
 } from "pdfjs-dist";
-import type { DocumentInitParameters } from "pdfjs-dist/types/src/display/api";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import type { DocumentInitParameters } from "pdfjs-dist/types/src/display/api";
 import {
-  LABEL_HEIGHT_PX,
-  LABEL_WIDTH_PX,
   binarizeRgbaBuffer,
   computeRasterGeometry,
-  isApproximately50x50Mm,
-  pointsToMillimeters,
   type DitherMode,
   type FitMode,
+  isApproximately50x50Mm,
+  LABEL_HEIGHT_PX,
+  LABEL_WIDTH_PX,
+  pointsToMillimeters,
   type RotationDegrees,
 } from "./binarizer.ts";
+
+import {
+  MAX_PDF_BYTES,
+  MAX_PDF_PAGES,
+  validatePdfBytes,
+  validatePdfPageCount,
+} from "./validation.ts";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const SUPERSAMPLE_FACTOR = 4;
+
+export { MAX_PDF_BYTES, MAX_PDF_PAGES, validatePdfBytes, validatePdfPageCount };
 
 export interface RasterOptions {
   fitMode: FitMode;
@@ -56,6 +65,7 @@ type SecureDocumentInitParameters = DocumentInitParameters & {
 };
 
 export function createPdfLoadingTask(pdfBytes: Uint8Array): PDFDocumentLoadingTask {
+  validatePdfBytes(pdfBytes);
   // Pass a copy so PDF.js worker buffer transfer does not detach the caller's Uint8Array.
   const params: SecureDocumentInitParameters = {
     data: pdfBytes.slice(),
@@ -170,6 +180,7 @@ export async function rasterizePdfDocument(
   const loadingTask = createPdfLoadingTask(pdfBytes);
   const pdfDoc = await loadingTask.promise;
   try {
+    validatePdfPageCount(pdfDoc.numPages);
     const pages: RenderedLabelPage[] = [];
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
       pages.push(await renderPdfPageToLabel(pdfDoc, pageNum, options));
